@@ -1,0 +1,31 @@
+/* Variables globales - se mantienen aquí para compartir en toda la aplicación */
+:root {
+  --primary-color: #2c3e50;
+  --secondary-color: #3498db;
+  --accent-color: #1abc9c;
+  --background-color: #f5f7fa;
+  --text-color: #333;
+  --light-text: #f5f7fa;
+  --card-bg: #ffffff;
+  --border-radius: 8px;
+  --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --transition: all 0.3s ease;
+}
+
+/* Estilos del contenedor principal de la aplicación */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--background-color);
+}
+
+/* Estilos generales */
+body {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--text-color);
+  background-color: var(--background-color);
+  margin: 0;
+  padding: 0;
+  line-height: 1.6;
+} 

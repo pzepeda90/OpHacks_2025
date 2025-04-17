@@ -1,0 +1,503 @@
+.article-card {
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  margin-bottom: 2rem;
+  overflow: hidden;
+  transition: var(--transition);
+  border: 1px solid #eaeaea;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  padding-top: 35px; /* Espacio para los badges */
+}
+
+.article-card:hover {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Estilo para cards con datos incompletos o genéricos */
+.article-card-warning {
+  border-left: 4px solid #ffc107;
+}
+
+.article-card-warning .article-title {
+  color: #e67e22;
+}
+
+.article-card-warning .article-title::after {
+  content: " ⚠️";
+  font-size: 0.8em;
+}
+
+.article-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #eaeaea;
+  background-color: #f8f9fa;
+}
+
+.article-title {
+  color: var(--primary-color);
+  font-size: 1.4rem;
+  margin: 0 0 0.5rem;
+  line-height: 1.3;
+  /* Evitar que choque con el badge de prioridad */
+  padding-right: 50px;
+}
+
+.article-authors {
+  color: #555;
+  font-size: 0.95rem;
+  margin: 0 0 1rem;
+  font-style: italic;
+}
+
+.article-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 0.5rem;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.meta-item {
+  background-color: rgba(52, 152, 219, 0.05);
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.meta-label {
+  font-weight: 600;
+  margin-right: 0.4rem;
+  color: var(--primary-color);
+}
+
+/* Estilo especial para la revista */
+.meta-item:nth-child(2) {
+  background-color: rgba(46, 204, 113, 0.08);
+  border-left: 2px solid rgba(46, 204, 113, 0.5);
+}
+
+.article-body {
+  padding: 1.5rem;
+}
+
+.article-section {
+  margin-bottom: 1.5rem;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  color: var(--primary-color);
+  margin: 0 0 0.8rem;
+  font-weight: 600;
+}
+
+.abstract-content {
+  line-height: 1.6;
+  color: var(--text-color);
+  text-align: justify;
+}
+
+.mesh-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.mesh-term {
+  background-color: rgba(52, 152, 219, 0.1);
+  color: var(--secondary-color);
+  padding: 0.3rem 0.7rem;
+  border-radius: 30px;
+  font-size: 0.85rem;
+  display: inline-block;
+}
+
+.secondary-analysis {
+  background-color: rgba(26, 188, 156, 0.05);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  border-left: 3px solid var(--accent-color);
+}
+
+.analysis-content {
+  line-height: 1.6;
+  color: var(--text-color);
+}
+
+.article-footer {
+  padding: 1rem 1.5rem;
+  background-color: #f8f9fa;
+  border-top: 1px solid #eaeaea;
+  text-align: right;
+}
+
+.pubmed-link {
+  color: var(--secondary-color);
+  text-decoration: none;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pubmed-link:hover {
+  text-decoration: underline;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .article-meta {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .article-title {
+    font-size: 1.2rem;
+  }
+  
+  .article-header, 
+  .article-body {
+    padding: 1rem;
+  }
+}
+
+/* Estilos para el análisis en formato tarjeta */
+.card-analysis {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin: 20px 0;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.card-header {
+  background-color: #f8fafc;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.badges {
+  display: flex;
+  gap: 10px;
+}
+
+.badge {
+  padding: 5px 10px;
+  border-radius: 50px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+
+.badge.quality {
+  background-color: #fef9c3;
+  color: #854d0e;
+}
+
+.badge.type {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+.card-section {
+  padding: 15px 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.card-section:last-child {
+  border-bottom: none;
+}
+
+.card-section h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.card-section p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.card-section ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.card-section li {
+  margin-bottom: 5px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.evaluation-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.evaluation-item .label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 768px) {
+  .evaluation-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .badges {
+    margin-top: 10px;
+  }
+}
+
+/* Estilo para artículos completamente analizados */
+.article-fully-analyzed {
+  border-left: 4px solid #4caf50;
+}
+
+/* Estilo para artículos parcialmente analizados */
+.article-partially-analyzed {
+  border-left: 4px solid #ff9800;
+}
+
+/* Badge de prioridad/relevancia */
+.priority-badge {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  z-index: 10;
+  transition: transform 0.2s ease;
+}
+
+.priority-badge-inner {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  text-align: center;
+}
+
+.score-value {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.score-label {
+  font-size: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.9;
+}
+
+/* Badge de tipo de estudio */
+.study-type-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  padding: 5px 10px;
+  border-radius: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Colores para los diferentes tipos de estudio */
+.study-meta-analysis {
+  background-color: #8e44ad;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 0 0 8px 0;
+  display: inline-block;
+}
+
+.study-systematic-review {
+  background-color: #9b59b6;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 0 0 8px 0;
+  display: inline-block;
+}
+
+.study-rct {
+  background-color: #3498db;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 0 0 8px 0;
+  display: inline-block;
+}
+
+.study-cohort {
+  background-color: #2ecc71;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 0 0 8px 0;
+  display: inline-block;
+}
+
+.study-case-control {
+  background-color: #f39c12;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 0 0 8px 0;
+  display: inline-block;
+}
+
+.study-case-series {
+  background-color: #e67e22;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 0 0 8px 0;
+  display: inline-block;
+}
+
+.study-review {
+  background-color: #16a085;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 0 0 8px 0;
+  display: inline-block;
+}
+
+.study-unknown {
+  background-color: #7f8c8d;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 0 0 8px 0;
+  display: inline-block;
+}
+
+.analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.analysis-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 30px;
+}
+
+.complete-analysis {
+  background-color: rgba(46, 204, 113, 0.15);
+  color: #27ae60;
+  padding: 0.25rem 0.75rem;
+  border-radius: 30px;
+}
+
+.partial-analysis {
+  background-color: rgba(243, 156, 18, 0.15);
+  color: #d35400;
+  padding: 0.25rem 0.75rem;
+  border-radius: 30px;
+}
+
+.analysis-complete {
+  border-left-color: #2ecc71;
+}
+
+.analysis-summary {
+  border-left-color: #f39c12;
+}
+
+.analysis-error {
+  background-color: rgba(231, 76, 60, 0.1);
+  border-left: 3px solid #e74c3c;
+  border-radius: var(--border-radius);
+  padding: 1rem;
+}
+
+.analysis-error p {
+  color: #c0392b;
+  margin: 0;
+}
+
+.article-fully-analyzed:hover {
+  border-left-width: 6px;
+}
+
+/* Colores para los badges de análisis según tipo de estudio */
+.badge.type {
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Aplicar colores específicos según el texto del badge */
+.badge.type:contains("Meta-análisis") {
+  background-color: #8e44ad;
+}
+
+.badge.type:contains("Revisión sistemática") {
+  background-color: #9b59b6;
+}
+
+.badge.type:contains("Ensayo clínico aleatorizado"),
+.badge.type:contains("ECA") {
+  background-color: #3498db;
+}
+
+.badge.type:contains("Cohorte") {
+  background-color: #2ecc71; 
+}
+
+.badge.type:contains("Casos y controles") {
+  background-color: #f39c12;
+}
+
+.badge.type:contains("Serie de casos"),
+.badge.type:contains("Reporte de caso") {
+  background-color: #e67e22;
+}
+
+.badge.type:contains("Revisión") {
+  background-color: #16a085;
+}
+
+/* Sobrescribir estilo anterior de badge.type */
+.badge.type {
+  background-color: #7f8c8d;
+} 

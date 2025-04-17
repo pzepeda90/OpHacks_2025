@@ -1,0 +1,288 @@
+.diagnosis-panel {
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin: 15px 0;
+  overflow: hidden;
+  font-size: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.diagnosis-header {
+  background-color: #3498db;
+  color: white;
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.diagnosis-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.diagnosis-mini-status {
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.diagnosis-content {
+  padding: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.diagnosis-tabs {
+  display: flex;
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 12px;
+}
+
+.diagnosis-tabs button {
+  background: none;
+  border: none;
+  padding: 6px 12px;
+  margin-right: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  border-bottom: 2px solid transparent;
+}
+
+.diagnosis-tabs button.active {
+  border-bottom: 2px solid #3498db;
+  font-weight: bold;
+}
+
+.diagnosis-tab-content {
+  padding: 8px 0;
+}
+
+.diagnosis-item {
+  margin-bottom: 8px;
+  padding: 4px 0;
+  border-bottom: 1px dotted #eee;
+}
+
+.diagnosis-error {
+  color: #e74c3c;
+  background-color: #fdeaea;
+  padding: 8px;
+  border-radius: 4px;
+  margin: 8px 0;
+}
+
+.diagnosis-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.diagnosis-actions button {
+  background-color: #eee;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.diagnosis-actions button:hover {
+  background-color: #ddd;
+}
+
+/* Estilos para la pestaña de flujo */
+.diagnosis-flow-steps {
+  padding-left: 20px;
+  margin: 0;
+}
+
+.diagnosis-flow-steps li {
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+  background-color: #f9f9f9;
+  border-left: 3px solid #ccc;
+}
+
+.diagnosis-flow-steps li.completed {
+  border-left: 3px solid #2ecc71;
+  background-color: #f5fff5;
+}
+
+.diagnosis-flow-steps li.in-progress {
+  border-left: 3px solid #f39c12;
+  background-color: #fffbf0;
+}
+
+.flow-status {
+  margin-left: 8px;
+  font-weight: bold;
+}
+
+.flow-details {
+  margin-top: 4px;
+  font-style: italic;
+  color: #666;
+  display: block;
+  width: 100%;
+}
+
+/* Estilos para la pestaña de respuesta API */
+.diagnosis-api-data {
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.diagnosis-api-header {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.diagnosis-api-header .success {
+  color: #27ae60;
+}
+
+.diagnosis-api-header .error {
+  color: #e74c3c;
+}
+
+.diagnosis-api-body > div {
+  margin-bottom: 5px;
+}
+
+.diagnosis-api-results {
+  margin-top: 10px;
+}
+
+.diagnosis-api-results ul {
+  margin-top: 5px;
+  padding-left: 20px;
+}
+
+.diagnosis-api-results li {
+  margin-bottom: 4px;
+}
+
+.analysis-indicator {
+  margin-left: 5px;
+  color: #3498db;
+}
+
+.diagnosis-no-data {
+  color: #777;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+}
+
+/* Estilos para la pestaña de estrategia */
+.diagnosis-strategy-content {
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.diagnosis-strategy-content pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0 0 10px 0;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px;
+  background-color: #fff;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+.diagnosis-strategy-content button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.diagnosis-strategy-content button:hover {
+  background-color: #2980b9;
+}
+
+/* Estilos para la información de Socket.IO */
+.socket-info {
+  margin-bottom: 20px;
+  padding: 12px;
+  border-radius: 6px;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+}
+
+.socket-info h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 16px;
+  color: #4a5568;
+}
+
+.socket-status {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.status-indicator.connected {
+  background-color: #48bb78;
+  box-shadow: 0 0 0 2px rgba(72, 187, 120, 0.2);
+}
+
+.status-indicator.disconnected {
+  background-color: #f56565;
+  box-shadow: 0 0 0 2px rgba(245, 101, 101, 0.2);
+}
+
+.socket-error {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background-color: #fff5f5;
+  border-left: 3px solid #f56565;
+  border-radius: 4px;
+}
+
+.socket-error p {
+  margin: 0;
+  color: #e53e3e;
+  font-size: 14px;
+}
+
+.socket-message {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background-color: #f0fff4;
+  border-left: 3px solid #48bb78;
+  border-radius: 4px;
+}
+
+.socket-message p {
+  margin: 0;
+  color: #38a169;
+  font-size: 14px;
+} 
