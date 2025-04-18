@@ -204,6 +204,10 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
     
     // Mostrar el spinner global durante la búsqueda
     document.getElementById('global-spinner-container').style.display = 'flex';
+    const globalSpinnerText = document.querySelector('.global-spinner-text');
+    if (globalSpinnerText) {
+      globalSpinnerText.textContent = "Procesando su consulta científica...";
+    }
     
     try {
       // PASO 1: Formulando pregunta clínica
@@ -244,7 +248,37 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       
       // PASO 3: Buscando artículos en PubMed
       logInfo("PASO 3: Buscando artículos en PubMed");
-      notificationService.updateProcessStep(processAlert, searchSteps, 2);
+      
+      // Actualizar mensaje de progreso para este paso que toma más tiempo
+      notificationService.updateProcessStep(
+        processAlert, 
+        searchSteps, 
+        2, 
+        "<strong>Consultando bases de datos científicas...</strong><br>Este proceso puede demorar hasta 60 segundos mientras recuperamos los artículos más relevantes para tu consulta."
+      );
+      
+      // Actualizar el texto del spinner global
+      if (globalSpinnerText) {
+        globalSpinnerText.textContent = "Consultando PubMed para encontrar la mejor evidencia científica...";
+        
+        // Crear un intervalo para cambiar el mensaje cada 12 segundos
+        const spinnerMessages = [
+          "Buscando en base de datos de PubMed...",
+          "Recuperando artículos científicos relevantes...",
+          "Filtrando por nivel de evidencia científica...",
+          "Esto puede tomar un momento, pero valdrá la pena...",
+          "Estamos trabajando a toda velocidad para ti..."
+        ];
+        
+        let messageIndex = 0;
+        const messageInterval = setInterval(() => {
+          messageIndex = (messageIndex + 1) % spinnerMessages.length;
+          globalSpinnerText.textContent = spinnerMessages[messageIndex];
+        }, 12000);
+        
+        // Guardar el ID del intervalo para limpiarlo más tarde
+        window.searchSpinnerIntervalId = messageInterval;
+      }
       
       // Usar directamente pubmedService para buscar en PubMed
       let pubmedResults = null;
@@ -284,7 +318,18 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
             const realArticles = pubmedResults.results;
             
             if (iaEnabled) {
-              notificationService.updateProcessStep(processAlert, searchSteps, 3);
+              notificationService.updateProcessStep(
+                processAlert, 
+                searchSteps, 
+                3, 
+                "<strong>Analizando artículos científicos...</strong><br>Estamos evaluando la metodología y conclusiones de cada estudio para ofrecerte el mejor análisis posible."
+              );
+              
+              // Actualizar el texto del spinner global
+              if (globalSpinnerText) {
+                globalSpinnerText.textContent = "Analizando la evidencia científica encontrada...";
+              }
+              
               logInfo("PASO 4: Analizando resultados reales con IA");
               
               try {
@@ -342,12 +387,8 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
             });
             logInfo("Búsqueda guardada en historial");
             
-            // Mostrar notificación de éxito
+            // Cerrar notificación de proceso, pero no mostrar notificación de éxito que cause duplicados
             notificationService.closeNotification(processAlert);
-            notificationService.showSuccess(
-              "Búsqueda completada", 
-              `Se encontraron ${realArticles.length} artículos relacionados con su consulta.`
-            );
             
             setLoading(false);
             return;
@@ -388,6 +429,12 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       setLoading(false);
       // Ocultar el spinner global cuando termine el proceso
       document.getElementById('global-spinner-container').style.display = 'none';
+      
+      // Limpiar el intervalo por si acaso
+      if (window.searchSpinnerIntervalId) {
+        clearInterval(window.searchSpinnerIntervalId);
+        window.searchSpinnerIntervalId = null;
+      }
     }
   };
 
@@ -407,12 +454,66 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
     setShowSynthesisModal(true);
     setShowReferences(false);
 
+    // Definir los pasos del proceso de síntesis
+    const synthesisSteps = [
+      {
+        title: "Analizando artículos científicos",
+        description: "Extrayendo información relevante de los estudios seleccionados"
+      },
+      {
+        title: "Evaluando calidad metodológica",
+        description: "Valorando el nivel de evidencia y posibles sesgos de cada artículo"
+      },
+      {
+        title: "Sintetizando hallazgos",
+        description: "Organizando la evidencia según temas y relevancia clínica"
+      },
+      {
+        title: "Generando conclusiones",
+        description: "Integrando toda la evidencia para responder a tu pregunta clínica"
+      }
+    ];
+    
+    // Mostrar notificación de proceso de síntesis con pasos
+    const synthesisAlert = notificationService.showProcessSteps(
+      synthesisSteps, 
+      0, 
+      "<strong>Preparando análisis de evidencia científica</strong><br>Estamos organizando los datos de los artículos para un análisis exhaustivo."
+    );
+    
+    // Actualizar el spinner global para mayor visibilidad
+    const globalSpinnerContainer = document.getElementById('global-spinner-container');
+    const globalSpinnerText = document.querySelector('.global-spinner-text');
+    
+    if (globalSpinnerContainer && globalSpinnerText) {
+      globalSpinnerContainer.style.display = 'flex';
+      globalSpinnerText.textContent = "Analizando evidencia científica...";
+      
+      // Mensajes rotativos para el proceso de síntesis
+      const synthesisMessages = [
+        "Analizando metodología y calidad de los estudios...",
+        "Evaluando nivel de evidencia de cada artículo...",
+        "Contrastando hallazgos entre los diferentes estudios...",
+        "Organizando conclusiones en base a la mejor evidencia disponible...",
+        "Generando una síntesis rigurosa para tu pregunta clínica...",
+        "Este proceso puede tardar hasta un minuto, pero el resultado valdrá la pena..."
+      ];
+      
+      let messageIndex = 0;
+      const messageInterval = setInterval(() => {
+        messageIndex = (messageIndex + 1) % synthesisMessages.length;
+        globalSpinnerText.textContent = synthesisMessages[messageIndex];
+      }, 10000);
+      
+      // Guardar el ID del intervalo para limpiarlo más tarde
+      window.synthesiSpinnerIntervalId = messageInterval;
+    }
+
     try {
-      // Notificar al usuario que el proceso ha comenzado
-      notificationService.showSuccess(
-        "Sintetizando evidencia", 
-        "Estamos creando una síntesis crítica de la evidencia científica. Este proceso puede tardar hasta un minuto."
-      );
+      // Avanzar al primer paso después de 1 segundo para simular progreso
+      setTimeout(() => {
+        notificationService.updateProcessStep(synthesisAlert, synthesisSteps, 1);
+      }, 1000);
 
       // Preparar datos para la síntesis
       const articlesData = articles.map(article => ({
@@ -426,9 +527,29 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
 
       logInfo("Datos de artículos preparados para síntesis", { count: articlesData.length });
 
+      // Avanzar al segundo paso después de 2 segundos
+      setTimeout(() => {
+        notificationService.updateProcessStep(
+          synthesisAlert, 
+          synthesisSteps, 
+          2,
+          "<strong>Sintetizando hallazgos científicos</strong><br>Organizando la información por temas y relevancia clínica."
+        );
+      }, 8000);
+
       // Calcular puntuación de calidad de evidencia (1-5 estrellas)
       let evidenceScore = calculateEvidenceRating(articles);
       setEvidenceRating(evidenceScore);
+      
+      // Avanzar al tercer paso después de otros 3 segundos
+      setTimeout(() => {
+        notificationService.updateProcessStep(
+          synthesisAlert, 
+          synthesisSteps, 
+          3,
+          "<strong>Generando conclusiones</strong><br>Este es el paso final que puede tomar hasta 30 segundos."
+        );
+      }, 16000);
       
       // Llamar al servicio para generar la síntesis
       const result = await aiService.generateSynthesis(searchQuery, articlesData);
@@ -439,15 +560,32 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       
       // Guardar el resultado
       setSynthesisContent(processedContent);
+      
+      // Cerrar alerta de proceso y mostrar confirmación
+      notificationService.closeNotification(synthesisAlert);
+
     } catch (error) {
       logError("Error al generar síntesis", error);
+      
+      // Cerrar alerta de proceso y mostrar error
+      notificationService.closeNotification(synthesisAlert);
       notificationService.showError(
         "Error en síntesis", 
-        "No se pudo completar la síntesis de la evidencia. Por favor, intente de nuevo."
+        `No se pudo generar la síntesis: ${error.message}`
       );
-      setShowSynthesisModal(false);
     } finally {
       setSynthesisLoading(false);
+      
+      // Ocultar spinner global
+      if (globalSpinnerContainer) {
+        globalSpinnerContainer.style.display = 'none';
+      }
+      
+      // Limpiar intervalo de mensajes
+      if (window.synthesiSpinnerIntervalId) {
+        clearInterval(window.synthesiSpinnerIntervalId);
+        window.synthesiSpinnerIntervalId = null;
+      }
     }
   };
 
@@ -469,6 +607,36 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
     // Valor predeterminado si no se pueden evaluar los artículos
     if (!articles || articles.length === 0) return 3;
     
+    // Extraer calificación directamente de los badges de calidad (★★★☆☆)
+    let totalStars = 0;
+    let countedArticles = 0;
+    
+    // Primero intentamos extraer las calificaciones de estrellas directamente de los badges
+    articles.forEach(article => {
+      if (article.secondaryAnalysis) {
+        // Buscar el badge de calidad con estrellas
+        const qualityBadgeMatch = article.secondaryAnalysis.match(/<span class="badge quality">([★☆]+)<\/span>/);
+        
+        if (qualityBadgeMatch && qualityBadgeMatch[1]) {
+          // Contar el número de estrellas completas (★)
+          const stars = qualityBadgeMatch[1].split('').filter(char => char === '★').length;
+          if (stars > 0) {
+            totalStars += stars;
+            countedArticles++;
+            console.log(`Artículo con ${stars} estrellas detectado`);
+          }
+        }
+      }
+    });
+    
+    // Si encontramos estrellas, usar ese promedio
+    if (countedArticles > 0) {
+      const avgStars = totalStars / countedArticles;
+      console.log(`Calificación media de estrellas: ${avgStars.toFixed(1)} (${totalStars} estrellas en ${countedArticles} artículos)`);
+      return Math.min(5, Math.max(1, Math.round(avgStars)));
+    }
+    
+    // Método alternativo basado en el tipo de estudio si no se encontraron badges
     // Ponderación por tipo de estudio (más alto = mejor evidencia)
     const weights = {
       'meta-análisis': 5,
@@ -484,7 +652,7 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
     };
     
     let totalWeight = 0;
-    let countedArticles = 0;
+    countedArticles = 0;
     
     // Analizar artículos y extraer tipo de estudio
     articles.forEach(article => {
@@ -496,6 +664,7 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
           if (analysis.includes(studyType)) {
             totalWeight += weight;
             countedArticles++;
+            console.log(`Artículo con tipo de estudio ${studyType} detectado (peso ${weight})`);
             break; // Contar solo el tipo de estudio de mayor nivel por artículo
           }
         }
@@ -503,10 +672,14 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
     });
     
     // Si no se pudo determinar para ningún artículo, usar valor medio
-    if (countedArticles === 0) return 3;
+    if (countedArticles === 0) {
+      console.log('No se pudo determinar la calidad de ningún artículo, usando valor predeterminado (3)');
+      return 3;
+    }
     
     // Calcular promedio y escalar a 1-5
     const avgWeight = totalWeight / countedArticles;
+    console.log(`Calificación media por tipo de estudio: ${avgWeight.toFixed(1)} (${countedArticles} artículos)`);
     return Math.min(5, Math.max(1, Math.round(avgWeight)));
   };
 
@@ -632,7 +805,7 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       {/* Spinner global para mostrar durante el proceso */}
       <div id="global-spinner-container" className="global-spinner-container">
         <Spinner />
-        <p className="global-spinner-text">Procesando su consulta...</p>
+        <p className="global-spinner-text spinner-text-animated">Procesando su consulta...</p>
       </div>
       
       {/* Modal de síntesis que se muestra cuando showSynthesisModal es true */}
@@ -659,11 +832,52 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
               {synthesisLoading ? (
                 <div className="synthesis-loading">
                   <Spinner />
-                  <p>Analizando artículos y sintetizando evidencia científica...</p>
+                  <p className="synthesis-loading-title">Sintetizando evidencia científica...</p>
+                  <div className="synthesis-loading-phases">
+                    <div className="synthesis-loading-phase">
+                      <div className="phase-icon">📄</div>
+                      <div className="phase-content">
+                        <div className="phase-title">Extracción de datos</div>
+                        <div className="phase-description">Organizando hallazgos de los estudios</div>
+                      </div>
+                    </div>
+                    <div className="synthesis-loading-phase">
+                      <div className="phase-icon">🔍</div>
+                      <div className="phase-content">
+                        <div className="phase-title">Análisis crítico</div>
+                        <div className="phase-description">Evaluando calidad metodológica</div>
+                      </div>
+                    </div>
+                    <div className="synthesis-loading-phase">
+                      <div className="phase-icon">🧩</div>
+                      <div className="phase-content">
+                        <div className="phase-title">Síntesis temática</div>
+                        <div className="phase-description">Integrando resultados similares</div>
+                      </div>
+                    </div>
+                    <div className="synthesis-loading-phase">
+                      <div className="phase-icon">⚖️</div>
+                      <div className="phase-content">
+                        <div className="phase-title">Ponderación de evidencia</div>
+                        <div className="phase-description">Considerando el nivel de cada estudio</div>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="synthesis-loading-message spinner-text-animated">Este proceso puede tomar hasta un minuto. Gracias por tu paciencia mientras elaboramos una síntesis rigurosa.</p>
                 </div>
               ) : (
                 <div className="synthesis-content">
                   <h3>Respuesta a la pregunta: {searchQuery}</h3>
+                  
+                  {/* Descargo de responsabilidad médica */}
+                  <div className="synthesis-disclaimer">
+                    <div className="disclaimer-icon">⚠️</div>
+                    <div className="disclaimer-content">
+                      <h4>Aviso importante</h4>
+                      <p>La IA puede cometer errores. Esta síntesis no reemplaza una consulta médica ni el criterio médico profesional. Esta herramienta fue creada para ser un apoyo clínico al quehacer de los profesionales de la salud.</p>
+                    </div>
+                  </div>
+                  
                   <div className="synthesis-text">
                     {synthesisContent ? (
                       <div dangerouslySetInnerHTML={{ __html: synthesisContent }} />
@@ -676,20 +890,17 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
                   <div className={`references-section ${showReferences ? 'visible' : ''}`}>
                     <h4>Referencias</h4>
                     <ol className="references-list">
-                      {articles.map((article, index) => (
-                        <li key={article.pmid || index}>
-                          <strong>{
-                            typeof article.authors === 'string' 
-                              ? article.authors.split(',')[0] 
-                              : (Array.isArray(article.authors) && article.authors.length > 0 
-                                  ? article.authors[0].name || article.authors[0] 
-                                  : 'Autor desconocido')
-                          }</strong>
-                          {article.authors && article.authors.length > 1 ? ' et al.' : ''}, 
-                          {article.publicationDate ? new Date(article.publicationDate).getFullYear() : ''}. 
-                          {article.title}. 
-                          {article.journal && <em> {article.journal}</em>}. 
-                          {article.pmid && <a href={`https://pubmed.ncbi.nlm.nih.gov/${article.pmid}/`} target="_blank" rel="noopener noreferrer">PMID: {article.pmid}</a>}
+                      {articles.map((article) => (
+                        <li key={article.pmid}>
+                          {article.authors && 
+                            `${article.authors}. `}
+                          <strong>{article.title}</strong> 
+                          {article.source && 
+                            ` ${article.source}.`}
+                          {article.publicationDate && 
+                            ` ${article.publicationDate}.`}
+                          {article.pmid && 
+                            ` PMID: ${article.pmid}`}
                         </li>
                       ))}
                     </ol>
@@ -751,7 +962,7 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       )}
       
       <div className="search-section">
-        <h2 className="search-title">Consulta Médica Inteligente</h2>
+        <h2 className="search-title">Evident-IA: Consulta Médica Inteligente</h2>
         <div className="search-description">
           <p>Obtenga respuestas rápidas y precisas a sus consultas clínicas</p>
         </div>
@@ -838,7 +1049,13 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
             {loading ? (
               <div className="spinner-container">
                 <Spinner />
-                <p className="spinner-text">Procesando su consulta. Este proceso puede tardar hasta 2 minutos...</p>
+                <p className="spinner-text spinner-text-animated">
+                  Procesando su consulta científica...
+                  <br />
+                  <span className="spinner-text-small">
+                    Este proceso puede tardar hasta 2 minutos dependiendo de la complejidad de la búsqueda
+                  </span>
+                </p>
               </div>
             ) : (
               <div className="articles-grid">

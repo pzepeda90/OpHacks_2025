@@ -6,7 +6,7 @@ const Navbar = () => {
     <nav className="navbar">
       <div className="navbar-container">
         <div className="navbar-logo">
-          <h1>OpHacks</h1>
+          <h1>Evident-IA</h1>
           <span className="logo-subtitle">Asistente Médico Inteligente</span>
         </div>
         <div className="navbar-links">

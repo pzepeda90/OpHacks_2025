@@ -1,7 +1,7 @@
 {
-  "name": "u2",
+  "name": "evident-ia-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Backend para Evident-IA, asistente médico inteligente",
   "main": "index.js",
   "type": "module",
   "scripts": {

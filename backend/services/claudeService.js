@@ -407,7 +407,7 @@ Tu análisis debe presentarse en formato VISUAL de TARJETA o FICHA TÉCNICA con 
   <div class="card-header">
     <h3>ANÁLISIS DE EVIDENCIA</h3>
     <div class="badges">
-      <span class="badge quality">★★★☆☆</span>
+      <span class="badge quality">★★★★☆</span>
       <span class="badge type">Meta-análisis</span>
     </div>
   </div>
@@ -464,6 +464,12 @@ Tu análisis debe presentarse en formato VISUAL de TARJETA o FICHA TÉCNICA con 
 IMPORTANTE:
 1. USA EXACTAMENTE el formato HTML proporcionado - la estructura de divs y clases es esencial.
 2. La CALIFICACIÓN de calidad (de 1 a 5 estrellas) debe aparecer como un badge en el encabezado.
+   - AJUSTA el número de estrellas según la calidad y relevancia del artículo (1-5 estrellas)
+   - Para calificar con 4 estrellas, usa: <span class="badge quality">★★★★☆</span>
+   - Para calificar con 3 estrellas, usa: <span class="badge quality">★★★☆☆</span>
+   - Para calificar con 5 estrellas, usa: <span class="badge quality">★★★★★</span>
+   - Para calificar con 2 estrellas, usa: <span class="badge quality">★★☆☆☆</span>
+   - Para calificar con 1 estrella, usa: <span class="badge quality">★☆☆☆☆</span>
 3. INCLUYE el TIPO DE ESTUDIO como un segundo badge junto a la calificación.
 4. COMPLETA todas las secciones requeridas con información concisa y clara.
 5. MANTÉN el análisis breve pero exhaustivo, con énfasis en los puntos más relevantes.`;

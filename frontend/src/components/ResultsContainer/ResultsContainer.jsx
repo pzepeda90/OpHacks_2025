@@ -18,53 +18,53 @@ const ResultsContainer = ({ searchStrategy, articles, loading }) => {
           <div className="loading-spinner"></div>
           <p>Buscando artículos y analizando resultados...</p>
         </div>
-      ) : (
+      ) : articles.length > 0 ? (
         <>
+          {/* Alerta de descargo de responsabilidad médica */}
+          <div className="medical-disclaimer">
+            <div className="disclaimer-icon">⚠️</div>
+            <div className="disclaimer-content">
+              <h4>Aviso importante</h4>
+              <p>La IA puede cometer errores. Esta información no reemplaza una consulta médica ni el criterio médico profesional. Esta herramienta fue creada para ser un apoyo clínico al quehacer de los profesionales de la salud.</p>
+            </div>
+          </div>
+
           {searchStrategy && (
             <div className="search-strategy">
-              <h3>Estrategia de búsqueda</h3>
+              <h3>Estrategia de búsqueda generada:</h3>
               <pre>{searchStrategy}</pre>
             </div>
           )}
           
-          {articles.length > 0 ? (
-            <>
-              <div className="results-summary">
-                <h2>Resultados ({articles.length})</h2>
-                
-                {hasPrioritizedArticles && (
-                  <div className="priority-info">
-                    <div className="priority-icon">🔍</div>
-                    <div className="priority-message">
-                      <p>
-                        <strong>Artículos priorizados:</strong> Los resultados han sido ordenados según su relevancia para 
-                        tu consulta. El sistema ha asignado una puntuación basada en el tipo de estudio, fecha de 
-                        publicación, prestigio de la revista y relevancia del contenido.
-                      </p>
-                      {hasAnalysis && (
-                        <p>
-                          <strong>{fullyAnalyzedCount} estudio{fullyAnalyzedCount !== 1 ? 's' : ''}</strong> de mayor relevancia 
-                          {fullyAnalyzedCount !== 1 ? ' han sido analizados' : ' ha sido analizado'} en detalle por IA. 
-                          El resto se muestra con un análisis básico.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
+          {hasPrioritizedArticles && (
+            <div className="priority-info">
+              <div className="priority-icon">ℹ️</div>
+              <div className="priority-message">
+                <p>Los artículos han sido priorizados basados en su relevancia para su consulta, considerando:</p>
+                <p>- Nivel de evidencia científica (meta-análisis, revisiones sistemáticas, etc.)</p>
+                <p>- Actualidad de los estudios</p>
+                <p>- Relevancia temática para su pregunta</p>
+                {hasAnalysis && <p>- Se ha realizado un análisis detallado de los artículos más relevantes</p>}
               </div>
-              
-              <div className="results-list">
-                {articles.map((article, index) => (
-                  <Card key={article.pmid || index} article={article} />
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="no-results">
-              <p>No se encontraron artículos para esta consulta. Intenta modificar la estrategia de búsqueda.</p>
             </div>
           )}
+          
+          <div className="results-list">
+            {articles.map((article) => (
+              <Card key={article.pmid} article={article} />
+            ))}
+          </div>
         </>
+      ) : (
+        <div className="no-results">
+          <p>No se encontraron artículos científicos para su consulta.</p>
+          <p>Sugerencias:</p>
+          <ul>
+            <li>Intente utilizar términos más generales</li>
+            <li>Verifique la ortografía de los términos</li>
+            <li>Pruebe con sinónimos de los términos médicos</li>
+          </ul>
+        </div>
       )}
     </div>
   );

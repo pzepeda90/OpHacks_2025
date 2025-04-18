@@ -1,35 +1,36 @@
 .spinner {
-  display: flex;
+  display: inline-flex;
   justify-content: center;
   align-items: center;
-  width: 100%;
-  height: 120px;
+  width: 50px;
+  height: 50px;
 }
 
 .spinner-inner {
   position: relative;
-  width: 70px;
-  height: 70px;
+  width: 100%;
+  height: 100%;
 }
 
 .spinner-circle {
   position: absolute;
-  border: 4px solid transparent;
-  border-top: 4px solid var(--primary-color, #3498db);
-  border-radius: 50%;
   width: 100%;
   height: 100%;
-  animation: spin 1s linear infinite;
+  border-radius: 50%;
+  border: 4px solid transparent;
+  border-top-color: #3498db;
+  animation: spin 1s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+  filter: drop-shadow(0 0 2px rgba(52, 152, 219, 0.3));
 }
 
 .spinner-circle-outer {
   position: absolute;
-  border: 4px solid transparent;
-  border-right: 4px solid var(--secondary-color, #2980b9);
-  border-radius: 50%;
   width: 100%;
   height: 100%;
-  animation: spin-reverse 1.2s linear infinite;
+  border-radius: 50%;
+  border: 4px solid transparent;
+  border-right-color: #2ecc71;
+  animation: spin 1.5s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
 }
 
 .spinner-container {
@@ -37,26 +38,88 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  padding: 3rem 0;
+  padding: 30px;
+  margin: 20px 0;
   text-align: center;
+  background-color: #f8f9fa;
+  border-radius: 10px;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
 }
 
 .spinner-text {
-  margin-top: 1.5rem;
-  color: var(--secondary-color, #2980b9);
+  margin-top: 15px;
+  font-size: 1rem;
+  color: #495057;
+  max-width: 500px;
+  line-height: 1.5;
+}
+
+.spinner-text-small {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Animación de pulso para el texto */
+.spinner-text-animated {
+  animation: pulse-text 2s infinite;
+}
+
+@keyframes pulse-text {
+  0% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.8;
+  }
+}
+
+/* Estilo para el spinner global que puede aparecer en cualquier parte de la aplicación */
+.global-spinner-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.8);
+  display: none; /* Por defecto oculto, se muestra vía JavaScript */
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(3px);
+}
+
+.global-spinner-text {
+  margin-top: 20px;
+  font-size: 1.2rem;
+  color: #2c3e50;
   font-weight: 500;
+  text-align: center;
+  max-width: 80%;
+  animation: pulse-text 2s infinite;
+}
+
+/* Estilo específico para el spinner de síntesis */
+.synthesis-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+}
+
+.synthesis-loading p {
+  margin-top: 20px;
   font-size: 1.1rem;
-}
-
-/* Para spinner en contexto global */
-.global-spinner-container .spinner {
-  height: auto;
-}
-
-.global-spinner-container .spinner-inner {
-  width: 80px;
-  height: 80px;
+  color: #3498db;
+  animation: pulse-text 2s infinite;
 }
 
 /* Animaciones */

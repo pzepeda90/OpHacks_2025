@@ -9,8 +9,10 @@ const Footer = () => {
       <div className="footer-container">
         <div className="footer-content">
           <div className="footer-section">
-            <h3 className="footer-title">OpHacks</h3>
-            <p>Asistente médico inteligente para profesionales de la salud</p>
+            <h3 className="footer-title">Evident-IA</h3>
+            <p className="footer-description">
+              Una plataforma basada en IA para consultas médicas científicas.
+            </p>
           </div>
           
           <div className="footer-section">
@@ -24,7 +26,7 @@ const Footer = () => {
         </div>
         
         <div className="footer-bottom">
-          <p>&copy; {currentYear} OpHacks. Todos los derechos reservados.</p>
+          <p>&copy; {currentYear} Evident-IA. Todos los derechos reservados.</p>
         </div>
       </div>
     </footer>
