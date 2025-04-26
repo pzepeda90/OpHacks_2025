@@ -500,4 +500,126 @@
 /* Sobrescribir estilo anterior de badge.type */
 .badge.type {
   background-color: #7f8c8d;
+}
+
+/* Variables para colores de métricas */
+:root {
+  --metric-excellent: #2ecc71;
+  --metric-good: #27ae60;
+  --metric-average: #f39c12;
+  --metric-fair: #e67e22;
+  --metric-poor: #e74c3c;
+}
+
+/* Estilos para métricas de iCite */
+.icite-metrics {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.metrics-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  color: #495057;
+  font-weight: 600;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.metric-indicator {
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  padding: 0.3rem 0;
+}
+
+.metric-label {
+  font-weight: 500;
+  margin-right: 0.3rem;
+  color: #495057;
+}
+
+.metric-value {
+  font-weight: 600;
+}
+
+/* Estilos para el análisis de IA estructurado */
+.analysis-section {
+  margin-top: 1.5rem;
+}
+
+.analysis-content {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.article-rating {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.rating-label {
+  font-weight: 500;
+  margin-right: 0.5rem;
+}
+
+.star-rating {
+  margin-right: 0.5rem;
+}
+
+.star-rating .fa-star {
+  color: #e0e0e0;
+  margin-right: 2px;
+}
+
+.star-rating .fa-star.active {
+  color: #ffc107;
+}
+
+.rating-text {
+  font-style: italic;
+  color: #6c757d;
+  font-size: 0.85rem;
+}
+
+.relevance-section,
+.strengths-section,
+.limitations-section,
+.conclusion-section {
+  margin-bottom: 1rem;
+}
+
+.relevance-section h4,
+.strengths-section h4,
+.limitations-section h4,
+.conclusion-section h4 {
+  font-size: 0.95rem;
+  margin-bottom: 0.3rem;
+  color: #495057;
+}
+
+.analysis-badge {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+.analysis-badge.limited {
+  background-color: #ffeeba;
+  color: #856404;
+}
+
+.analysis-badge.error {
+  background-color: #f8d7da;
+  color: #721c24;
 } 

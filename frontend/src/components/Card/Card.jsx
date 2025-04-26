@@ -160,48 +160,134 @@ const createMarkup = (html) => {
   return { __html: html };
 };
 
+/**
+ * Formatea un valor numérico para mostrar con el número de decimales especificado
+ * @param {number} value - Valor a formatear
+ * @param {number} decimals - Número de decimales
+ * @returns {string} - Valor formateado
+ */
+const formatNumber = (value, decimals = 2) => {
+  if (value === undefined || value === null) return 'N/A';
+  return typeof value === 'number' ? value.toFixed(decimals) : 'N/A';
+};
+
+/**
+ * Renderiza un indicador de métrica con escala de colores
+ * @param {string} label - Etiqueta de la métrica
+ * @param {number|string} value - Valor de la métrica
+ * @param {string} tooltip - Texto de ayuda
+ * @param {number} max - Valor máximo para la escala
+ * @returns {JSX.Element} - Elemento JSX
+ */
+const MetricIndicator = ({ label, value, tooltip, max = 100 }) => {
+  // Determinar el color basado en el valor (0-100%)
+  const percentage = typeof value === 'number' ? Math.min(value / max * 100, 100) : 0;
+  const getColor = () => {
+    if (percentage >= 80) return 'var(--metric-excellent)';
+    if (percentage >= 60) return 'var(--metric-good)';
+    if (percentage >= 40) return 'var(--metric-average)';
+    if (percentage >= 20) return 'var(--metric-fair)';
+    return 'var(--metric-poor)';
+  };
+
+  return (
+    <div className="metric-indicator" title={tooltip}>
+      <span className="metric-label">{label}:</span>
+      <span className="metric-value" style={{ color: getColor() }}>
+        {typeof value === 'number' ? formatNumber(value) : value}
+      </span>
+    </div>
+  );
+};
+
+/**
+ * Componente para mostrar las métricas de iCite
+ * @param {Object} metrics - Métricas de iCite
+ * @returns {JSX.Element} - Elemento JSX
+ */
+const ICiteMetrics = ({ metrics }) => {
+  if (!metrics) return null;
+  
+  return (
+    <div className="icite-metrics">
+      <h4 className="metrics-title">Métricas de impacto</h4>
+      <div className="metrics-grid">
+        <MetricIndicator 
+          label="RCR" 
+          value={metrics.rcr} 
+          tooltip="Relative Citation Ratio - Compara las citas con la media del campo" 
+          max={5} 
+        />
+        <MetricIndicator 
+          label="APT" 
+          value={metrics.apt} 
+          tooltip="Approximate Potential to Translate - Potencial de traslación clínica" 
+          max={100} 
+        />
+        <MetricIndicator 
+          label="Citas clínicas" 
+          value={metrics.clinical_citations} 
+          tooltip="Número de citas en artículos clínicos" 
+          max={50} 
+        />
+        <MetricIndicator 
+          label="Total citas" 
+          value={metrics.citation_count} 
+          tooltip="Número total de citas" 
+          max={100} 
+        />
+      </div>
+    </div>
+  );
+};
+
 const Card = ({ article }) => {
-  const {
-    publicationDate,
-    doi,
-    pmid,
-    title,
-    authors,
-    abstract,
-    meshTerms,
-    secondaryAnalysis,
-    fullyAnalyzed,
-    priorityScore,
-    analysisError,
-    journal
-  } = article;
+  if (!article) {
+    console.error("Se intentó renderizar Card sin datos de artículo");
+    return <div className="article-card article-card-warning">Error: Datos de artículo no disponibles</div>;
+  }
+
+  // Asegurar que las propiedades existan para evitar errores
+  const articleData = {
+    publicationDate: article.publicationDate || "Fecha no disponible",
+    doi: article.doi || null,
+    pmid: article.pmid || `unknown-${Math.random().toString(36).substr(2, 9)}`,
+    title: article.title || "Título no disponible",
+    authors: article.authors || [],
+    abstract: article.abstract || "Resumen no disponible",
+    meshTerms: Array.isArray(article.meshTerms) ? article.meshTerms : [],
+    priorityScore: typeof article.priorityScore === 'number' ? article.priorityScore : null,
+    source: article.source || "Fuente no especificada",
+    secondaryAnalysis: article.secondaryAnalysis || article.analysis?.content,
+    iCiteMetrics: article.iCiteMetrics || null
+  };
 
   // Usar las funciones de formateo para manejar diferentes casos
-  const authorsList = formatAuthors(authors);
-  const formattedTitle = formatTitle(title);
+  const authorsList = formatAuthors(articleData.authors);
+  const formattedTitle = formatTitle(articleData.title);
 
   // Determinar el tipo de estudio
-  const studyType = determineStudyType(title, abstract);
+  const studyType = determineStudyType(articleData.title, articleData.abstract);
 
   // Crear URL al artículo original en PubMed
-  const pubmedUrl = pmid ? `https://pubmed.ncbi.nlm.nih.gov/${pmid}/` : null;
+  const pubmedUrl = articleData.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${articleData.pmid}/` : null;
 
   // Verificar si todos los datos son válidos
   const hasValidData = formattedTitle !== "Sin título disponible" && 
                       authorsList !== "Autores no disponibles" &&
-                      abstract;
+                      articleData.abstract;
 
   // Verificar si el análisis contiene HTML con formato de tarjeta
-  const hasCardFormat = secondaryAnalysis && 
-    (secondaryAnalysis.includes('<div class="card-analysis">') || 
-     secondaryAnalysis.includes('class="card-header"') ||
-     secondaryAnalysis.includes('class="badges"'));
+  const hasCardFormat = articleData.secondaryAnalysis && 
+    (articleData.secondaryAnalysis.includes('<div class="card-analysis">') || 
+     articleData.secondaryAnalysis.includes('class="card-header"') ||
+     articleData.secondaryAnalysis.includes('class="badges"'));
 
   useEffect(() => {
     // Función para aplicar colores personalizados a los badges de tipo
     const applyBadgeColors = () => {
       // Verificar si hay análisis secundario y buscar badges
-      if (secondaryAnalysis && hasCardFormat) {
+      if (articleData.secondaryAnalysis && hasCardFormat) {
         // Esperar a que el DOM se actualice
         setTimeout(() => {
           // Seleccionar todos los badges de tipo dentro de esta tarjeta
@@ -243,20 +329,20 @@ const Card = ({ article }) => {
     };
     
     applyBadgeColors();
-  }, [secondaryAnalysis, hasCardFormat]);
+  }, [articleData.secondaryAnalysis, hasCardFormat]);
 
   return (
-    <div className={`article-card ${!hasValidData ? 'article-card-warning' : ''} ${fullyAnalyzed ? 'article-fully-analyzed' : 'article-partially-analyzed'}`}>
+    <div className={`article-card ${!hasValidData ? 'article-card-warning' : ''}`}>
       {/* Mostrar badge de tipo de estudio */}
       <div className="study-type-badge">
         <span className={studyType.class}>{studyType.label}</span>
       </div>
       
       {/* Mostrar badge de prioridad si existe */}
-      {priorityScore !== undefined && (
+      {articleData.priorityScore !== undefined && (
         <div className="priority-badge">
           <div className="priority-badge-inner">
-            <span className="score-value">{priorityScore}</span>
+            <span className="score-value">{articleData.priorityScore}</span>
             <span className="score-label">relevancia</span>
           </div>
         </div>
@@ -267,21 +353,21 @@ const Card = ({ article }) => {
         <p className="article-authors">{authorsList}</p>
         <div className="article-meta">
           <span className="meta-item">
-            <span className="meta-label">Fecha:</span> {publicationDate || "No disponible"}
+            <span className="meta-label">Fecha:</span> {articleData.publicationDate}
           </span>
-          {journal && (
+          {articleData.source && (
             <span className="meta-item">
-              <span className="meta-label">Revista:</span> {journal}
+              <span className="meta-label">Fuente:</span> {articleData.source}
             </span>
           )}
-          {doi && (
+          {articleData.doi && (
             <span className="meta-item">
-              <span className="meta-label">DOI:</span> {doi}
+              <span className="meta-label">DOI:</span> {articleData.doi}
             </span>
           )}
-          {pmid && (
+          {articleData.pmid && (
             <span className="meta-item">
-              <span className="meta-label">PMID:</span> {pmid}
+              <span className="meta-label">PMID:</span> {articleData.pmid}
             </span>
           )}
         </div>
@@ -290,14 +376,14 @@ const Card = ({ article }) => {
       <div className="article-body">
         <div className="article-section">
           <h3 className="section-title">Abstract</h3>
-          <p className="abstract-content">{abstract || "Abstract no disponible"}</p>
+          <p className="abstract-content">{articleData.abstract || "Abstract no disponible"}</p>
         </div>
 
-        {meshTerms && meshTerms.length > 0 && (
+        {articleData.meshTerms && articleData.meshTerms.length > 0 && (
           <div className="article-section">
             <h3 className="section-title">Términos MeSH</h3>
             <div className="mesh-terms">
-              {meshTerms.map((term, index) => (
+              {articleData.meshTerms.map((term, index) => (
                 <span key={index} className="mesh-term">
                   {term}
                 </span>
@@ -306,34 +392,16 @@ const Card = ({ article }) => {
           </div>
         )}
 
-        {secondaryAnalysis && (
-          <div className={`article-section secondary-analysis ${fullyAnalyzed ? 'analysis-complete' : 'analysis-summary'}`}>
+        {articleData.secondaryAnalysis && (
+          <div className={`article-section secondary-analysis`}>
             <div className="analysis-header">
               <h3 className="section-title">Análisis con IA</h3>
-              {fullyAnalyzed !== undefined && (
-                <div className="analysis-badge">
-                  {fullyAnalyzed ? 
-                    <span className="complete-analysis">Análisis detallado</span> : 
-                    <span className="partial-analysis">Análisis básico</span>
-                  }
-                </div>
-              )}
             </div>
             
             <div className="analysis-content">
-              {analysisError ? (
-                <div className="analysis-error">
-                  <p>Ocurrió un error durante el análisis. {secondaryAnalysis}</p>
-                </div>
-              ) : hasCardFormat ? (
-                // Renderizar HTML si tiene formato de tarjeta
-                <div dangerouslySetInnerHTML={createMarkup(secondaryAnalysis)} />
-              ) : (
-                // Renderizar como texto normal
-                secondaryAnalysis.split('\n').map((line, index) => (
-                  <p key={index}>{line}</p>
-                ))
-              )}
+              {articleData.secondaryAnalysis.split('\n').map((line, index) => (
+                <p key={index}>{line}</p>
+              ))}
             </div>
           </div>
         )}
@@ -351,6 +419,9 @@ const Card = ({ article }) => {
           </a>
         </div>
       )}
+
+      {/* Métrica de iCite */}
+      {articleData.iCiteMetrics && <ICiteMetrics metrics={articleData.iCiteMetrics} />}
     </div>
   );
 };

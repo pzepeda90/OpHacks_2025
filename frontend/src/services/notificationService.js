@@ -332,6 +332,47 @@ class NotificationService {
       this.showProcessSteps(steps, newCurrentStep, customMessage);
     }
   }
+
+  /**
+   * Actualiza solo el texto de una notificación existente sin cambiar el título ni el icono
+   * @param {object} alert - Objeto de alerta de SweetAlert2
+   * @param {string} message - Nuevo mensaje
+   */
+  updateText(alert, message) {
+    if (alert) {
+      Swal.update({
+        html: message
+      });
+    }
+  }
+
+  /**
+   * Muestra una notificación informativa
+   * @param {string} title - Título de la notificación
+   * @param {string} message - Mensaje de la notificación
+   */
+  showInfo(title, message) {
+    return Swal.fire({
+      title: title,
+      html: message,
+      icon: 'info',
+      confirmButtonText: 'Entendido'
+    });
+  }
+
+  /**
+   * Muestra una notificación de advertencia
+   * @param {string} title - Título de la notificación
+   * @param {string} message - Mensaje de la notificación
+   */
+  showWarning(title, message) {
+    return Swal.fire({
+      title: title,
+      html: message,
+      icon: 'warning',
+      confirmButtonText: 'Entendido'
+    });
+  }
 }
 
 export default new NotificationService(); 

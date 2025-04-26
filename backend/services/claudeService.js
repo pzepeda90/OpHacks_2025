@@ -663,6 +663,143 @@ IMPORTANTE:
     
     return results;
   }
+
+  /**
+   * Genera una estrategia de búsqueda refinada basada en resultados iniciales
+   * @param {Object} data - Datos para generar la estrategia refinada
+   * @param {string} data.question - Pregunta clínica original
+   * @param {string} data.initialStrategy - Estrategia de búsqueda inicial
+   * @param {Array} data.initialResults - Resultados iniciales
+   * @returns {Promise<string>} - Estrategia de búsqueda refinada
+   */
+  async generateRefinedStrategy(data) {
+    const method = 'generateRefinedStrategy';
+    
+    if (!data || !data.question || !data.initialStrategy || !data.initialResults) {
+      const error = new Error('Se requieren datos completos para generar estrategia refinada');
+      logError(method, error.message);
+      throw error;
+    }
+    
+    const { question, initialStrategy, initialResults } = data;
+    
+    logInfo(method, `Generando estrategia refinada para pregunta: "${question.substring(0, 100)}${question.length > 100 ? '...' : ''}"`);
+    logInfo(method, `Estrategia inicial: "${initialStrategy.substring(0, 100)}${initialStrategy.length > 100 ? '...' : ''}"`);
+    logInfo(method, `Resultados iniciales: ${initialResults.length} artículos`);
+    
+    // Crear un resumen de los resultados iniciales para el prompt
+    const resultsSummary = initialResults.map((article, index) => 
+      `${index + 1}. PMID: ${article.pmid} - Título: ${article.title.substring(0, 150)}`
+    ).join('\n');
+    
+    // Prompt para generar una estrategia refinada
+    const prompt = `Eres Claude, un asistente experto en investigación biomédica y estrategias avanzadas de búsqueda de literatura científica.
+
+Has recibido una pregunta clínica y generaste una estrategia de búsqueda inicial que produjo resultados, pero ahora necesitamos refinar esa estrategia para obtener resultados más específicos y precisos.
+
+PREGUNTA CLÍNICA ORIGINAL:
+${question}
+
+ESTRATEGIA DE BÚSQUEDA INICIAL:
+${initialStrategy}
+
+RESULTADOS INICIALES (${initialResults.length} artículos):
+${resultsSummary}
+
+INSTRUCCIONES:
+1. Analiza la pregunta clínica original y los resultados obtenidos.
+2. Identifica si la estrategia inicial fue demasiado amplia o capturó artículos irrelevantes.
+3. Determina qué tipo de estructura sería mejor para esta pregunta (PICO, PICOT o SPIDER).
+4. Crea una estrategia de búsqueda refinada que:
+   - Sea más específica y precisa que la inicial.
+   - Mantenga alta relevancia clínica.
+   - Utilice términos MeSH más precisos y combinaciones booleanas optimizadas.
+   - Incorpore filtros adicionales si es apropiado (años, tipos de estudios, etc.).
+   - Siga siendo compatible con la sintaxis de PubMed.
+
+ENTREGA:
+Proporciona SOLAMENTE la estrategia de búsqueda refinada, sin texto adicional, explicaciones o introducciones. El resultado debe estar listo para ser usado directamente en PubMed.`;
+
+    try {
+      logInfo(method, 'Enviando solicitud a Claude para estrategia refinada');
+      
+      const response = await this.generateResponse(prompt, {
+        temperature: 0.5 // Temperatura más baja para resultados más deterministas
+      });
+      
+      // Validar y limpiar la respuesta
+      if (!response || typeof response !== 'string') {
+        throw new Error('Respuesta vacía o inválida de Claude');
+      }
+      
+      // Extraer solo la estrategia de búsqueda (eliminar texto explicativo)
+      const cleanResponse = this._extractSearchStrategy(response);
+      
+      logInfo(method, `Estrategia refinada generada: "${cleanResponse.substring(0, 100)}${cleanResponse.length > 100 ? '...' : ''}"`);
+      return cleanResponse;
+      
+    } catch (error) {
+      logError(method, 'Error generando estrategia refinada', error);
+      throw new Error(`Error generando estrategia refinada: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Extrae la estrategia de búsqueda del texto de respuesta
+   * @param {string} responseText - Texto de respuesta de Claude
+   * @returns {string} - Estrategia de búsqueda extraída
+   * @private
+   */
+  _extractSearchStrategy(responseText) {
+    if (!responseText) return '';
+    
+    // Remover prefijos comunes que no deberían ser parte de la consulta
+    const prefixesToRemove = [
+      'La estrategia de búsqueda refinada sería:',
+      'La estrategia refinada sería:',
+      'La estrategia de búsqueda sería:',
+      'Estrategia de búsqueda:',
+      'Estrategia refinada:',
+      'Estrategia:',
+      'Refined search strategy:',
+      'Search strategy:'
+    ];
+    
+    let cleanedResponse = responseText.trim();
+    
+    // Eliminar prefijos
+    for (const prefix of prefixesToRemove) {
+      if (cleanedResponse.startsWith(prefix)) {
+        cleanedResponse = cleanedResponse.substring(prefix.length).trim();
+      }
+    }
+    
+    // Si la respuesta ya parece ser una estrategia de búsqueda (contiene paréntesis y operadores booleanos)
+    if (cleanedResponse.includes('(') && 
+        cleanedResponse.includes(')') && 
+        (cleanedResponse.includes(' AND ') || cleanedResponse.includes(' OR '))) {
+      return cleanedResponse;
+    }
+    
+    // Buscar secciones que puedan contener la estrategia
+    const patterns = [
+      /ESTRATEGIA DE BÚSQUEDA REFINADA:[\s\n]*(.+?)(?:\n\n|\n*$)/is,
+      /ESTRATEGIA REFINADA:[\s\n]*(.+?)(?:\n\n|\n*$)/is,
+      /ESTRATEGIA:[\s\n]*(.+?)(?:\n\n|\n*$)/is,
+      /REFINED SEARCH STRATEGY:[\s\n]*(.+?)(?:\n\n|\n*$)/is,
+      /SEARCH STRATEGY:[\s\n]*(.+?)(?:\n\n|\n*$)/is
+    ];
+    
+    for (const pattern of patterns) {
+      const match = cleanedResponse.match(pattern);
+      if (match && match[1] && match[1].trim().length > 10) {
+        return match[1].trim();
+      }
+    }
+    
+    // Si no se encontró un patrón específico, devolver la respuesta limpia
+    return cleanedResponse;
+  }
 }
 
 // Exportar una instancia del servicio

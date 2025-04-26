@@ -1,69 +1,49 @@
 import React from 'react';
-import Card from '../Card/Card';
+import Card from '../Card';
+import Loading from '../Loading';
 import './ResultsContainer.css';
 
-const ResultsContainer = ({ searchStrategy, articles, loading }) => {
-  // Contar artículos con análisis completo
-  const fullyAnalyzedCount = articles.filter(article => article.fullyAnalyzed).length;
-  const hasPartialAnalysis = articles.some(article => article.fullyAnalyzed === false);
-  const hasAnalysis = fullyAnalyzedCount > 0 || hasPartialAnalysis;
+const ResultsContainer = ({ articles = [], loading, error }) => {
+  console.log('ResultsContainer renderizando con:', { 
+    artículos: articles?.length || 0, 
+    cargando: loading,
+    tieneError: !!error
+  });
   
-  // Verificar si hay artículos priorizados
-  const hasPrioritizedArticles = articles.some(article => article.priorityScore !== undefined);
-  
+  if (Array.isArray(articles) && articles.length > 0) {
+    console.log('Primer artículo:', JSON.stringify(articles[0]?.title || 'No título disponible').substring(0, 50));
+  }
+
   return (
     <div className="results-container">
-      {loading ? (
-        <div className="loading-results">
-          <div className="loading-spinner"></div>
-          <p>Buscando artículos y analizando resultados...</p>
+      {loading && (
+        <div className="loading-container">
+          <Loading text="Cargando artículos científicos..." />
         </div>
-      ) : articles.length > 0 ? (
-        <>
-          {/* Alerta de descargo de responsabilidad médica */}
-          <div className="medical-disclaimer">
-            <div className="disclaimer-icon">⚠️</div>
-            <div className="disclaimer-content">
-              <h4>Aviso importante</h4>
-              <p>La IA puede cometer errores. Esta información no reemplaza una consulta médica ni el criterio médico profesional. Esta herramienta fue creada para ser un apoyo clínico al quehacer de los profesionales de la salud.</p>
-            </div>
-          </div>
+      )}
 
-          {searchStrategy && (
-            <div className="search-strategy">
-              <h3>Estrategia de búsqueda generada:</h3>
-              <pre>{searchStrategy}</pre>
-            </div>
-          )}
-          
-          {hasPrioritizedArticles && (
-            <div className="priority-info">
-              <div className="priority-icon">ℹ️</div>
-              <div className="priority-message">
-                <p>Los artículos han sido priorizados basados en su relevancia para su consulta, considerando:</p>
-                <p>- Nivel de evidencia científica (meta-análisis, revisiones sistemáticas, etc.)</p>
-                <p>- Actualidad de los estudios</p>
-                <p>- Relevancia temática para su pregunta</p>
-                {hasAnalysis && <p>- Se ha realizado un análisis detallado de los artículos más relevantes</p>}
-              </div>
-            </div>
-          )}
-          
-          <div className="results-list">
-            {articles.map((article) => (
-              <Card key={article.pmid} article={article} />
-            ))}
-          </div>
-        </>
-      ) : (
+      {!loading && error && (
+        <div className="error-container">
+          <h3>Error al cargar resultados</h3>
+          <p>{error}</p>
+        </div>
+      )}
+
+      {!loading && !error && Array.isArray(articles) && articles.length === 0 && (
         <div className="no-results">
-          <p>No se encontraron artículos científicos para su consulta.</p>
-          <p>Sugerencias:</p>
-          <ul>
-            <li>Intente utilizar términos más generales</li>
-            <li>Verifique la ortografía de los términos</li>
-            <li>Pruebe con sinónimos de los términos médicos</li>
-          </ul>
+          <h3>No se encontraron artículos científicos para su consulta</h3>
+          <p>Intente reformular su pregunta o utilizar términos más específicos.</p>
+        </div>
+      )}
+
+      {!loading && !error && Array.isArray(articles) && articles.length > 0 && (
+        <div className="articles-grid">
+          {articles.map((article) => (
+            <Card 
+              key={article.pmid || `article-${Math.random().toString(36).substring(2)}`} 
+              article={article} 
+            />
+          ))}
         </div>
       )}
     </div>

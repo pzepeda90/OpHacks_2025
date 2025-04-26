@@ -16,8 +16,8 @@ const config = {
   apis: {
     pubmed: {
       baseUrl: process.env.PUBMED_API_URL || 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils',
-      apiKey: process.env.PUBMED_API_KEY,
-      maxResults: parseInt(process.env.PUBMED_MAX_RESULTS || '20', 10)
+      apiKey: process.env.PUBMED_API_KEY || '',
+      maxResults: parseInt(process.env.PUBMED_MAX_RESULTS || '30', 10)
     },
     claude: {
       apiKey: process.env.CLAUDE_API_KEY,

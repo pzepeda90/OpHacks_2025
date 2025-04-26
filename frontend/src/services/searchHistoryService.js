@@ -49,7 +49,7 @@ class SearchHistoryService {
     // Crear objeto de búsqueda con timestamp
     const search = {
       ...searchData,
-      timestamp: new Date().toISOString(),
+      timestamp: searchData.timestamp || new Date().toISOString(),
       id: Date.now().toString()
     };
 
@@ -59,6 +59,14 @@ class SearchHistoryService {
     )].slice(0, MAX_HISTORY_ITEMS);
     
     this.saveHistory();
+  }
+
+  /**
+   * Alias de addSearch para mantener compatibilidad con cambios en Main.jsx
+   * @param {Object} searchData - Datos de la búsqueda
+   */
+  addToHistory(searchData) {
+    return this.addSearch(searchData);
   }
 
   /**

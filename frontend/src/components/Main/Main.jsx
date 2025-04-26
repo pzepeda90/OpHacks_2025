@@ -10,6 +10,7 @@ import searchHistoryService from "../../services/searchHistoryService";
 import pubmedService from "../../services/pubmedService";
 import "./Main.css";
 import io from "socket.io-client";
+import ResultsContainer from "../ResultsContainer";
 
 // Función para logs detallados
 const logInfo = (message, data) => {
@@ -247,193 +248,122 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       }
       
       // PASO 3: Buscando artículos en PubMed
-      logInfo("PASO 3: Buscando artículos en PubMed");
+      logInfo("PASO 3: Buscando artículos en PubMed", { 
+        hasStrategy: Boolean(searchStrategyText),
+        query: searchQuery
+      });
       
-      // Actualizar mensaje de progreso para este paso que toma más tiempo
-      notificationService.updateProcessStep(
-        processAlert, 
-        searchSteps, 
-        2, 
-        "<strong>Consultando bases de datos científicas...</strong><br>Este proceso puede demorar hasta 60 segundos mientras recuperamos los artículos más relevantes para tu consulta."
-      );
-      
-      // Actualizar el texto del spinner global
-      if (globalSpinnerText) {
-        globalSpinnerText.textContent = "Consultando PubMed para encontrar la mejor evidencia científica...";
-        
-        // Crear un intervalo para cambiar el mensaje cada 12 segundos
-        const spinnerMessages = [
-          "Buscando en base de datos de PubMed...",
-          "Recuperando artículos científicos relevantes...",
-          "Filtrando por nivel de evidencia científica...",
-          "Esto puede tomar un momento, pero valdrá la pena...",
-          "Estamos trabajando a toda velocidad para ti..."
-        ];
-        
-        let messageIndex = 0;
-        const messageInterval = setInterval(() => {
-          messageIndex = (messageIndex + 1) % spinnerMessages.length;
-          globalSpinnerText.textContent = spinnerMessages[messageIndex];
-        }, 12000);
-        
-        // Guardar el ID del intervalo para limpiarlo más tarde
-        window.searchSpinnerIntervalId = messageInterval;
-      }
-      
-      // Usar directamente pubmedService para buscar en PubMed
-      let pubmedResults = null;
+      notificationService.updateProcessStep(processAlert, searchSteps, 2);
       
       try {
-        logInfo("Iniciando búsqueda en PubMed", {
-          query: searchQuery,
-          strategy: searchStrategyText ? searchStrategyText.substring(0, 100) + "..." : "No disponible",
-          useAI: iaEnabled
+        // Ejecutar la búsqueda utilizando la función del App
+        const responseData = await onSearch(searchQuery, searchStrategyText);
+        logInfo("Respuesta recibida", { 
+          success: responseData?.success,
+          articleCount: responseData?.results?.length || 0,
+          hasStrategy: Boolean(responseData?.initialStrategy)
         });
         
-        const startApiTime = Date.now();
-        pubmedResults = await pubmedService.search(searchQuery, searchStrategyText, iaEnabled);
-        const endApiTime = Date.now();
+        // Actualizar estado con los resultados
+        setApiResponse(responseData);
+        setSearchResults(responseData);
         
-        logInfo(`Respuesta de PubMed recibida en ${endApiTime - startApiTime}ms`);
-        logInfo("Detalles de resultados:", {
-          totalResults: pubmedResults?.results?.length || 0,
-          strategy: pubmedResults?.searchStrategy ? "Generada" : "No disponible"
-        });
-        
-        setApiResponse(pubmedResults);
-        
-        // Verificar si hay resultados reales de PubMed
-        if (pubmedResults && pubmedResults.results && Array.isArray(pubmedResults.results)) {
-          const realArticlesCount = pubmedResults.results.length;
-          logInfo(`Artículos recibidos de PubMed: ${realArticlesCount}`);
+        // Verificar si hay resultados válidos
+        if (responseData && responseData.success && 
+            responseData.results && Array.isArray(responseData.results)) {
+          const receivedArticles = responseData.results;
           
-          if (realArticlesCount > 0) {
-            setSearchResults({
-              query: searchQuery,
-              iaEnabled: iaEnabled,
-              count: realArticlesCount
-            });
+          logInfo(`Recibidos ${receivedArticles.length} artículos`);
+          setArticles(receivedArticles);
+          
+          // PASO 4: Analizar resultados
+          notificationService.updateProcessStep(processAlert, searchSteps, 3);
+          
+          // Si hay artículos y tienen análisis, mostrar mensaje informativo
+          if (receivedArticles.length > 0) {
+            // Contar artículos con análisis
+            const analyzedCount = receivedArticles.filter(
+              article => article.analysis || article.secondaryAnalysis
+            ).length;
             
-            // PASO 4: Si hay resultados reales y la IA está habilitada, los analizamos
-            const realArticles = pubmedResults.results;
-            
-            if (iaEnabled) {
-              notificationService.updateProcessStep(
-                processAlert, 
-                searchSteps, 
-                3, 
-                "<strong>Analizando artículos científicos...</strong><br>Estamos evaluando la metodología y conclusiones de cada estudio para ofrecerte el mejor análisis posible."
+            if (analyzedCount > 0) {
+              logInfo(`${analyzedCount} artículos tienen análisis de IA`);
+              notificationService.showInfo(
+                "Análisis de IA completado", 
+                `Se ha aplicado análisis de IA a ${analyzedCount} de ${receivedArticles.length} artículos para mejorar su comprensión.`,
+                4000
               );
-              
-              // Actualizar el texto del spinner global
-              if (globalSpinnerText) {
-                globalSpinnerText.textContent = "Analizando la evidencia científica encontrada...";
-              }
-              
-              logInfo("PASO 4: Analizando resultados reales con IA");
-              
-              try {
-                logInfo(`Iniciando análisis de ${realArticlesCount} artículos reales`);
-                const startAnalysisTime = Date.now();
-                
-                // Comprobamos si los artículos ya tienen análisis del backend
-                const needAnalysis = !realArticles.some(article => article.secondaryAnalysis);
-                
-                let articlesWithAnalysis = realArticles;
-                
-                if (needAnalysis) {
-                  logInfo("Los artículos no tienen análisis del backend, realizando análisis con Claude");
-                  articlesWithAnalysis = await aiService.analyzeArticleBatch(realArticles, searchQuery);
-                } else {
-                  logInfo("Los artículos ya incluyen análisis del backend, no es necesario analizarlos de nuevo");
-                }
-                
-                const endAnalysisTime = Date.now();
-                logInfo(`Análisis completado en ${endAnalysisTime - startAnalysisTime}ms`);
-                
-                // Mostrar muestra de análisis
-                if (articlesWithAnalysis.length > 0 && articlesWithAnalysis[0].secondaryAnalysis) {
-                  logInfo("Muestra de análisis:", {
-                    pmid: articlesWithAnalysis[0].pmid,
-                    titulo: articlesWithAnalysis[0].title.substring(0, 50) + "...",
-                    analisis: articlesWithAnalysis[0].secondaryAnalysis.substring(0, 100) + "..."
-                  });
-                }
-                
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                logInfo(`Mostrando ${articlesWithAnalysis.length} artículos analizados`);
-                setArticles(articlesWithAnalysis);
-              } catch (error) {
-                logError("Error al analizar artículos reales", error);
-                notificationService.showError(
-                  "Error en análisis", 
-                  "No se pudo completar el análisis secundario de los artículos."
-                );
-                // Mostrar los artículos sin análisis
-                setArticles(realArticles);
-              }
-            } else {
-              // Si IA no está habilitada, mostramos los artículos tal cual
-              logInfo("IA desactivada, mostrando artículos sin análisis secundario");
-              setArticles(realArticles);
             }
-            
-            // Guardar la búsqueda en el historial
-            searchHistoryService.addSearch({
-              query: searchQuery,
-              useAI: iaEnabled,
-              resultsCount: realArticles.length,
-              strategy: searchStrategyText
-            });
-            logInfo("Búsqueda guardada en historial");
-            
-            // Cerrar notificación de proceso, pero no mostrar notificación de éxito que cause duplicados
-            notificationService.closeNotification(processAlert);
-            
-            setLoading(false);
-            return;
           }
+          
+          // Si no hay artículos, mostrar mensaje
+          if (receivedArticles.length === 0) {
+            logInfo("No se encontraron artículos para esta consulta");
+            notificationService.showInfo(
+              "Sin resultados", 
+              "No se encontraron artículos científicos para su consulta. Intente con términos más generales o sinónimos.",
+              5000
+            );
+          }
+          
+          // Guardar la búsqueda en el historial
+          logInfo("Guardando búsqueda en historial");
+          searchHistoryService.addToHistory({
+            query: searchQuery,
+            timestamp: new Date().toISOString(),
+            results: receivedArticles.length,
+            iaEnabled
+          });
+        } else {
+          // Si no hay resultados válidos, mostrar error
+          logError("Respuesta inválida o vacía", responseData);
+          setError({
+            title: "Error en búsqueda",
+            message: responseData?.error || "No se pudieron obtener resultados válidos."
+          });
+          
+          notificationService.showError(
+            "Error en búsqueda", 
+            responseData?.error || "No se pudieron obtener resultados válidos."
+          );
         }
+      } catch (error) {
+        logError("Error ejecutando búsqueda", error);
+        setError({
+          title: "Error en búsqueda",
+          message: error.message || "Ocurrió un error al procesar su consulta."
+        });
         
-        // Si llegamos aquí es porque no hay resultados reales
-        logInfo("No se encontraron artículos en PubMed o formato de respuesta inválido");
-        
-        // Mostrar notificación de no resultados
-        notificationService.closeNotification(processAlert);
-        notificationService.showInfo(
-          "Sin resultados", 
-          "No se encontraron artículos que coincidan con su consulta. Intente con términos más generales."
-        );
-        
-        setLoading(false);
-        return;
-      } catch (apiError) {
-        logError("Error en la búsqueda en PubMed", apiError);
-        notificationService.closeNotification(processAlert);
         notificationService.showError(
-          "Error en la búsqueda", 
-          `No se pudieron obtener resultados: ${apiError.message}`
+          "Error en búsqueda", 
+          error.message || "Ocurrió un error al procesar su consulta."
         );
-        setLoading(false);
-        return;
       }
       
     } catch (error) {
-      logError("Error general en el proceso de búsqueda", error);
-      notificationService.closeNotification(processAlert);
+      logError("Error general en proceso de búsqueda", error);
+      setError({
+        title: "Error",
+        message: error.message || "Ocurrió un error inesperado."
+      });
+      
       notificationService.showError(
-        "Error en la búsqueda", 
-        "No se pudieron obtener resultados para su consulta. Por favor, inténtelo de nuevo."
+        "Error", 
+        error.message || "Ocurrió un error inesperado."
       );
     } finally {
       setLoading(false);
-      // Ocultar el spinner global cuando termine el proceso
+      notificationService.closeNotification(processAlert);
+      
+      // Ocultar el spinner global
       document.getElementById('global-spinner-container').style.display = 'none';
       
-      // Limpiar el intervalo por si acaso
-      if (window.searchSpinnerIntervalId) {
-        clearInterval(window.searchSpinnerIntervalId);
-        window.searchSpinnerIntervalId = null;
+      // Desplazarse hacia los resultados
+      if (document.querySelector('.results-container')) {
+        document.querySelector('.results-container').scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
       }
     }
   };
@@ -1022,7 +952,7 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
               </div>
               
               {/* Botón de síntesis con IA */}
-              {articles.length > 0 && iaEnabled && (
+              {searchResults.results?.length > 0 && searchResults.iaEnabled && (
                 <button 
                   className="synthesis-button"
                   onClick={generateSynthesis}
@@ -1045,25 +975,17 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
               </div>
             )}
             
-            {/* Mostrar spinner durante la carga de artículos */}
-            {loading ? (
-              <div className="spinner-container">
-                <Spinner />
-                <p className="spinner-text spinner-text-animated">
-                  Procesando su consulta científica...
-                  <br />
-                  <span className="spinner-text-small">
-                    Este proceso puede tardar hasta 2 minutos dependiendo de la complejidad de la búsqueda
-                  </span>
-                </p>
-              </div>
-            ) : (
-              <div className="articles-grid">
-                {articles.map((article) => (
-                  <Card key={article.pmid || Math.random().toString(36)} article={article} />
-                ))}
-              </div>
-            )}
+            {/* Spinner durante la carga - se mostrará dentro de ResultsContainer */}
+            
+            {/* ResultsContainer se encarga de mostrar toda la información de resultados */}
+            <ResultsContainer 
+              searchStrategy={searchResults.initialStrategy}
+              initialStrategy={searchResults.initialStrategy}
+              refinedStrategy={searchResults.refinedStrategy}
+              searchMetrics={searchResults.searchMetrics}
+              articles={searchResults.results || []} 
+              loading={loading} 
+            />
           </div>
         )}
 
