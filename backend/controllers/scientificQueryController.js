@@ -323,7 +323,7 @@ const scientificQueryController = {
         priorityScore: score
       };
     });
-
+    
     // Ordenar artículos por puntuación (mayor a menor)
     scoredArticles.sort((a, b) => b.priorityScore - a.priorityScore);
     
