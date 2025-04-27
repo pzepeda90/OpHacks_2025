@@ -177,91 +177,161 @@ const scientificQueryController = {
    */
   _prioritizeArticles(articles, question, iCiteMetrics = {}) {
     const method = 'prioritizeArticles';
-    
     console.log(`Priorizando ${articles.length} artículos para la pregunta: "${question}"`);
-    
+
+    // Valores promedio/estándar para compensar datos faltantes
+    const DEFAULTS = {
+      relative_citation_ratio: 1.0, // Promedio típico
+      nih_percentile: 50,           // Percentil medio
+      citations_per_year: 2,        // Promedio bajo
+      year: new Date().getFullYear() - 5, // 5 años atrás
+      apt: 0.5,                     // Intermedio
+    };
+
+    // 1. Obtener PMIDs
+    const pmids = articles.map(a => a.pmid);
+    // 2. Obtener métricas iCite
+    let iciteMetricsList = [];
+    try {
+      iciteMetricsList = await iciteService.getMetrics(pmids);
+    } catch (err) {
+      console.error('Error obteniendo métricas iCite:', err.message);
+      // Si falla, continuar solo con los datos de PubMed
+      iciteMetricsList = [];
+    }
+    // 3. Crear un mapa para acceso rápido por PMID
+    const iciteMap = {};
+    if (Array.isArray(iciteMetricsList)) {
+      iciteMetricsList.forEach(m => { if (m && m.pmid) iciteMap[m.pmid] = m; });
+    } else if (iciteMetricsList && iciteMetricsList.pmid) {
+      iciteMap[iciteMetricsList.pmid] = iciteMetricsList;
+    }
+
     // Extraer términos clave de la pregunta
     const keywords = question.toLowerCase()
       .replace(/[.,?!;:()]/g, '')
       .split(' ')
       .filter(word => word.length > 3)
       .map(word => word.trim());
-      
     console.log('Términos clave extraídos:', keywords);
 
+    const prestigiousJournals = [
+      'nejm', 'new england', 'lancet', 'jama', 'bmj', 'british medical',
+      'annals of internal medicine', 'nature', 'science', 'cell',
+      'circulation', 'ophthalmology', 'journal of clinical',
+      'american journal', 'journal of', 'archives of'
+    ];
+
     const scoredArticles = articles.map(article => {
+      const icite = iciteMap[article.pmid] || {};
       let score = 0;
-      
-      // 1. Tipo de estudio (meta-análisis, revisión sistemática, etc.)
-      if (article.title) {
-        const lowerTitle = article.title.toLowerCase();
-        if (lowerTitle.includes('meta-analysis') || lowerTitle.includes('metaanalysis') || 
-            lowerTitle.includes('metanálisis')) {
-          score += 30;
-          console.log(`Artículo PMID ${article.pmid}: +30 puntos por ser meta-análisis`);
-        } else if (lowerTitle.includes('systematic review') || lowerTitle.includes('revisión sistemática')) {
-          score += 25;
-          console.log(`Artículo PMID ${article.pmid}: +25 puntos por ser revisión sistemática`);
-        } else if (lowerTitle.includes('review') || lowerTitle.includes('revisión')) {
-          score += 15;
-          console.log(`Artículo PMID ${article.pmid}: +15 puntos por ser revisión`);
-        } else if (lowerTitle.includes('randomized') || lowerTitle.includes('randomised') || 
-                  lowerTitle.includes('aleatorizado')) {
-          score += 10;
-          console.log(`Artículo PMID ${article.pmid}: +10 puntos por ser estudio aleatorizado`);
-        }
+      const breakdown = {};
+
+      // 1️⃣ Calidad Metodológica (20 pts)
+      let tipoEstudioPts = 0;
+      const lowerTitle = (article.title || '').toLowerCase();
+      if (lowerTitle.includes('meta-analysis') || lowerTitle.includes('metaanalysis') || lowerTitle.includes('metanálisis')) {
+        tipoEstudioPts = 15;
+      } else if (lowerTitle.includes('systematic review') || lowerTitle.includes('revisión sistemática')) {
+        tipoEstudioPts = 12;
+      } else if (lowerTitle.includes('review') || lowerTitle.includes('revisión')) {
+        tipoEstudioPts = 7;
+      } else if (lowerTitle.includes('randomized') || lowerTitle.includes('randomised') || lowerTitle.includes('aleatorizado')) {
+        tipoEstudioPts = 10;
+      } else if (lowerTitle.includes('cohort') || lowerTitle.includes('caso-control') || lowerTitle.includes('case-control')) {
+        tipoEstudioPts = 5;
       }
-      
-      // 2. Calidad de diseño basada en términos MeSH
+      let disenoMeSHPts = 0;
       if (article.meshTerms && Array.isArray(article.meshTerms)) {
         const qualityIndicators = ['double-blind', 'placebo-controlled', 'multicenter'];
         qualityIndicators.forEach(indicator => {
           if (article.meshTerms.some(term => term.toLowerCase().includes(indicator))) {
-            score += 5;
-            console.log(`Artículo PMID ${article.pmid}: +5 puntos por incluir término de calidad: ${indicator}`);
+            disenoMeSHPts += 2;
           }
         });
+        disenoMeSHPts = Math.min(disenoMeSHPts, 5);
       }
-      
-      // 3. Actualidad del estudio
-      if (article.publicationDate) {
-        const yearMatch = article.publicationDate.match(/\b(20\d{2})\b/);
-        if (yearMatch) {
-          const year = parseInt(yearMatch[1]);
-          const currentYear = new Date().getFullYear();
-          const yearsOld = currentYear - year;
-          
-          // Artículos más recientes reciben mayor puntuación
-          if (yearsOld <= 2) {
-            score += 20;
-            console.log(`Artículo PMID ${article.pmid}: +20 puntos por ser muy reciente (${year})`);
-          } else if (yearsOld <= 5) {
-            score += 15;
-            console.log(`Artículo PMID ${article.pmid}: +15 puntos por ser reciente (${year})`);
-          } else if (yearsOld <= 10) {
-            score += 5;
-            console.log(`Artículo PMID ${article.pmid}: +5 puntos por ser relativamente reciente (${year})`);
-          }
-        }
+      breakdown.calidadMetodologica = tipoEstudioPts + disenoMeSHPts;
+      breakdown.tipoEstudio = tipoEstudioPts;
+      breakdown.disenoMeSH = disenoMeSHPts;
+      score += tipoEstudioPts + disenoMeSHPts;
+
+      // 2️⃣ Impacto Científico (30 pts)
+      let rcr = parseFloat(icite.relative_citation_ratio);
+      if (isNaN(rcr)) rcr = DEFAULTS.relative_citation_ratio;
+      let rcrPts = 0;
+      if (rcr > 2.0) rcrPts = 15;
+      else if (rcr >= 1.5) rcrPts = 12;
+      else if (rcr >= 1.0) rcrPts = 8;
+      else if (rcr >= 0.5) rcrPts = 4;
+      else if (rcr > 0) rcrPts = 1;
+      let nih = parseFloat(icite.nih_percentile);
+      if (isNaN(nih)) nih = DEFAULTS.nih_percentile;
+      let nihPts = 0;
+      if (nih > 90) nihPts = 10;
+      else if (nih >= 75) nihPts = 7;
+      else if (nih >= 50) nihPts = 4;
+      else if (nih > 0) nihPts = 1;
+      let cpy = parseFloat(icite.citations_per_year);
+      if (isNaN(cpy)) cpy = DEFAULTS.citations_per_year;
+      let cpyPts = 0;
+      if (cpy >= 10) cpyPts = 5;
+      else if (cpy >= 5) cpyPts = 3;
+      else if (cpy >= 1) cpyPts = 1;
+      breakdown.impactoCientifico = rcrPts + nihPts + cpyPts;
+      breakdown.rcr = rcrPts;
+      breakdown.nihPercentil = nihPts;
+      breakdown.citasPorAnio = cpyPts;
+      score += rcrPts + nihPts + cpyPts;
+
+      // 3️⃣ Actualidad (10 pts)
+      let year = 0;
+      if (icite.year) year = parseInt(icite.year);
+      else if (article.publicationDate) {
+        const yearMatch = article.publicationDate.match(/\b(20\d{2}|19\d{2})\b/);
+        if (yearMatch) year = parseInt(yearMatch[1]);
       }
-      
-      // 4. Relevancia basada en keywords en título y abstract
+      if (!year) year = DEFAULTS.year;
+      let actualidadPts = 0;
+      if (year) {
+        const currentYear = new Date().getFullYear();
+        const yearsOld = currentYear - year;
+        if (yearsOld <= 2) actualidadPts = 10;
+        else if (yearsOld <= 5) actualidadPts = 7;
+        else if (yearsOld <= 10) actualidadPts = 3;
+      }
+      breakdown.actualidad = actualidadPts;
+      score += actualidadPts;
+
+      // 4️⃣ Aplicabilidad Clínica (15 pts)
+      let apt = parseFloat(icite.apt);
+      if (isNaN(apt)) apt = DEFAULTS.apt;
+      let aptPts = 0;
+      if (apt > 0.8) aptPts = 15;
+      else if (apt >= 0.6) aptPts = 10;
+      else if (apt >= 0.4) aptPts = 5;
+      else if (apt > 0) aptPts = 1;
+      breakdown.aplicabilidadClinica = aptPts;
+      score += aptPts;
+
+      // 5️⃣ Relevancia Temática (20 pts)
+      let kwTitlePts = 0;
       if (article.title) {
         keywords.forEach(keyword => {
           if (article.title.toLowerCase().includes(keyword)) {
-            score += 3;
-            console.log(`Artículo PMID ${article.pmid}: +3 puntos por keyword en título: ${keyword}`);
+            kwTitlePts += 3;
           }
         });
+        kwTitlePts = Math.min(kwTitlePts, 12);
       }
-      
+      let kwAbsPts = 0;
       if (article.abstract) {
         keywords.forEach(keyword => {
           if (article.abstract.toLowerCase().includes(keyword)) {
-            score += 1;
-            console.log(`Artículo PMID ${article.pmid}: +1 punto por keyword en abstract: ${keyword}`);
+            kwAbsPts += 1;
           }
         });
+        kwAbsPts = Math.min(kwAbsPts, 8);
       }
       
       // 5. Revistas reconocidas
@@ -320,7 +390,9 @@ const scientificQueryController = {
 
       return {
         ...article,
-        priorityScore: score
+        iciteMetrics: icite,
+        priorityScore: score,
+        scoreBreakdown: breakdown
       };
     });
     

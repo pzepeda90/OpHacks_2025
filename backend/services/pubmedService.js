@@ -30,7 +30,7 @@ class PubMedService {
       const searchParams = {
         db: 'pubmed',
         term: query,
-        retmax: maxResults,
+        retmax: Math.min(maxResults, 50),
         retmode: 'json',
         sort: 'relevance',
         api_key: this.apiKey
@@ -101,87 +101,90 @@ class PubMedService {
 
       // PASO 3: Obtener abstract y términos MeSH para cada artículo
       console.log('PASO 3: Obtención de abstracts y términos MeSH (efetch.fcgi)');
-      
-      // Procesar cada artículo
-      const articlesWithAbstracts = await Promise.all(
-        idList.map(async (pmid, index) => {
-          try {
-            console.log(`[${index + 1}/${idList.length}] Procesando artículo PMID: ${pmid}`);
-            const articleData = result[pmid];
-            if (!articleData) {
-              console.error(`No se encontraron datos para PMID ${pmid}`);
-              return null;
-            }
-            
-            // Obtener abstract y términos MeSH
-            const efetchUrl = `${this.baseUrl}/efetch.fcgi`;
-            const efetchParams = {
-              db: 'pubmed',
-              id: pmid,
-              retmode: 'xml',
-              api_key: this.apiKey
-            };
 
-            const startTimeEfetch = Date.now();
-            let efetchResponse;
+      // Procesar en lotes de 10 con delays exponenciales
+      const batchSize = 10;
+      const batches = [];
+      for (let i = 0; i < idList.length; i += batchSize) {
+        batches.push(idList.slice(i, i + batchSize));
+      }
+      let articlesWithAbstracts = [];
+      for (let b = 0; b < batches.length; b++) {
+        const batch = batches[b];
+        // Delay exponencial: 0ms, 500ms, 1000ms, 2000ms, 4000ms, ...
+        const delay = Math.pow(2, b) * 500;
+        if (b > 0) {
+          console.log(`Esperando ${delay}ms antes de procesar el lote ${b + 1}/${batches.length}`);
+          await new Promise(res => setTimeout(res, delay));
+        }
+        const batchResults = await Promise.all(
+          batch.map(async (pmid, index) => {
             try {
-              efetchResponse = await axios.get(efetchUrl, { params: efetchParams });
-              const endTimeEfetch = Date.now();
-              console.log(`Tiempo de respuesta efetch para PMID ${pmid}: ${endTimeEfetch - startTimeEfetch}ms`);
-            } catch (efetchError) {
-              console.error(`ERROR en llamada a efetch.fcgi para PMID ${pmid}:`);
-              console.error(`- Mensaje: ${efetchError.message}`);
-              if (efetchError.response) {
-                console.error(`- Estado HTTP: ${efetchError.response.status}`);
+              console.log(`[Lote ${b + 1}/${batches.length}] Procesando artículo PMID: ${pmid}`);
+              const articleData = result[pmid];
+              if (!articleData) {
+                console.error(`No se encontraron datos para PMID ${pmid}`);
+                return null;
               }
+              // Obtener abstract y términos MeSH
+              const efetchUrl = `${this.baseUrl}/efetch.fcgi`;
+              const efetchParams = {
+                db: 'pubmed',
+                id: pmid,
+                retmode: 'xml',
+                api_key: this.apiKey
+              };
+              const startTimeEfetch = Date.now();
+              let efetchResponse;
+              try {
+                efetchResponse = await axios.get(efetchUrl, { params: efetchParams });
+                const endTimeEfetch = Date.now();
+                console.log(`Tiempo de respuesta efetch para PMID ${pmid}: ${endTimeEfetch - startTimeEfetch}ms`);
+              } catch (efetchError) {
+                console.error(`ERROR en llamada a efetch.fcgi para PMID ${pmid}:`);
+                console.error(`- Mensaje: ${efetchError.message}`);
+                if (efetchError.response) {
+                  console.error(`- Estado HTTP: ${efetchError.response.status}`);
+                }
+                return null;
+              }
+              // Extraer abstract
+              const abstractMatch = efetchResponse.data.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/);
+              const abstractText = abstractMatch ? abstractMatch[1] : 'Abstract no disponible';
+              // Extraer términos MeSH
+              const meshTermsMatch = efetchResponse.data.match(/<DescriptorName[^>]*>(.*?)<\/DescriptorName>/g);
+              const meshTerms = meshTermsMatch
+                ? meshTermsMatch.map(term => {
+                    const match = term.match(/<DescriptorName[^>]*>(.*?)<\/DescriptorName>/);
+                    return match ? match[1] : null;
+                  }).filter(Boolean)
+                : [];
+              // Crear objeto de artículo
+              const rawArticleData = {
+                pmid: pmid,
+                doi: articleData.articleids?.find(id => id.idtype === 'doi')?.value || null,
+                title: this._sanitizeTitle(articleData.title),
+                authors: this._processAuthors(articleData.authors),
+                pubdate: articleData.pubdate || 'Fecha desconocida',
+                abstract: this._sanitizeText(abstractText),
+                meshTerms: meshTerms,
+                source: articleData.source || null
+              };
+              // Usar el modelo Article para estandarizar el formato
+              const article = new Article(rawArticleData);
+              return article;
+            } catch (error) {
+              console.error(`Error obteniendo detalles para PMID ${pmid}:`, error);
               return null;
             }
-            
-            // Extraer abstract
-            const abstractMatch = efetchResponse.data.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/);
-            const abstractText = abstractMatch ? abstractMatch[1] : 'Abstract no disponible';
-            console.log(`PMID ${pmid} - Abstract: ${abstractText.substring(0, 50)}...`);
-            
-            // Extraer términos MeSH
-            const meshTermsMatch = efetchResponse.data.match(/<DescriptorName[^>]*>(.*?)<\/DescriptorName>/g);
-            const meshTerms = meshTermsMatch
-              ? meshTermsMatch.map(term => {
-                  const match = term.match(/<DescriptorName[^>]*>(.*?)<\/DescriptorName>/);
-                  return match ? match[1] : null;
-                }).filter(Boolean)
-              : [];
-            
-            console.log(`PMID ${pmid} - Términos MeSH encontrados: ${meshTerms.length}`);
-            
-            // Crear objeto de artículo
-            const rawArticleData = {
-              pmid: pmid,
-              doi: articleData.articleids?.find(id => id.idtype === 'doi')?.value || null,
-              title: this._sanitizeTitle(articleData.title),
-              authors: this._processAuthors(articleData.authors),
-              pubdate: articleData.pubdate || 'Fecha desconocida',
-              abstract: this._sanitizeText(abstractText),
-              meshTerms: meshTerms,
-              source: articleData.source || null
-            };
-            
-            // Usar el modelo Article para estandarizar el formato
-            const article = new Article(rawArticleData);
-            
-            console.log(`PMID ${pmid} - Artículo procesado exitosamente: "${article.title.substring(0, 50)}..."`);
-            return article;
-          } catch (error) {
-            console.error(`Error obteniendo detalles para PMID ${pmid}:`, error);
-            return null;
-          }
-        })
-      );
-
+          })
+        );
+        articlesWithAbstracts = articlesWithAbstracts.concat(batchResults);
+      }
       // Filtrar resultados nulos
       const filteredResults = articlesWithAbstracts.filter(Boolean);
       console.log(`Resultados totales procesados exitosamente: ${filteredResults.length} de ${idList.length} encontrados`);
       console.log('===== PUBMED: BÚSQUEDA FINALIZADA EXITOSAMENTE =====');
-      
       return filteredResults;
     } catch (error) {
       console.error('===== PUBMED: ERROR EN BÚSQUEDA =====');
