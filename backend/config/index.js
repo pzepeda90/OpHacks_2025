@@ -22,6 +22,9 @@ const config = {
     claude: {
       apiKey: process.env.CLAUDE_API_KEY,
       baseUrl: process.env.CLAUDE_API_URL || 'https://api.anthropic.com'
+    },
+    icite: {
+      baseUrl: process.env.ICITE_API_URL || 'https://icite.od.nih.gov/api',
     }
   },
   

@@ -138,127 +138,161 @@ const scientificQueryController = {
    */
   _prioritizeArticles(articles, question) {
     const method = 'prioritizeArticles';
-    
     console.log(`Priorizando ${articles.length} artículos para la pregunta: "${question}"`);
-    
+
     // Extraer términos clave de la pregunta
     const keywords = question.toLowerCase()
       .replace(/[.,?!;:()]/g, '')
       .split(' ')
       .filter(word => word.length > 3)
       .map(word => word.trim());
-      
     console.log('Términos clave extraídos:', keywords);
+
+    const prestigiousJournals = [
+      'nejm', 'new england', 'lancet', 'jama', 'bmj', 'british medical',
+      'annals of internal medicine', 'nature', 'science', 'cell',
+      'circulation', 'ophthalmology', 'journal of clinical',
+      'american journal', 'journal of', 'archives of'
+    ];
 
     const scoredArticles = articles.map(article => {
       let score = 0;
-      
-      // 1. Tipo de estudio (meta-análisis, revisión sistemática, etc.)
+      let log = [];
+
+      // 1️⃣ Calidad Metodológica (20 pts)
+      // Tipo de estudio (máx. 15 pts)
+      let tipoEstudio = 0;
       if (article.title) {
         const lowerTitle = article.title.toLowerCase();
-        if (lowerTitle.includes('meta-analysis') || lowerTitle.includes('metaanalysis') || 
-            lowerTitle.includes('metanálisis')) {
-          score += 30;
-          console.log(`Artículo PMID ${article.pmid}: +30 puntos por ser meta-análisis`);
+        if (lowerTitle.includes('meta-analysis') || lowerTitle.includes('metaanalysis') || lowerTitle.includes('metanálisis')) {
+          tipoEstudio = 15; log.push('+15 meta-análisis');
         } else if (lowerTitle.includes('systematic review') || lowerTitle.includes('revisión sistemática')) {
-          score += 25;
-          console.log(`Artículo PMID ${article.pmid}: +25 puntos por ser revisión sistemática`);
+          tipoEstudio = 12; log.push('+12 revisión sistemática');
         } else if (lowerTitle.includes('review') || lowerTitle.includes('revisión')) {
-          score += 15;
-          console.log(`Artículo PMID ${article.pmid}: +15 puntos por ser revisión`);
-        } else if (lowerTitle.includes('randomized') || lowerTitle.includes('randomised') || 
-                  lowerTitle.includes('aleatorizado')) {
-          score += 10;
-          console.log(`Artículo PMID ${article.pmid}: +10 puntos por ser estudio aleatorizado`);
+          tipoEstudio = 7; log.push('+7 revisión narrativa');
+        } else if (lowerTitle.includes('randomized') || lowerTitle.includes('randomised') || lowerTitle.includes('aleatorizado')) {
+          tipoEstudio = 10; log.push('+10 estudio aleatorizado');
+        } else if (lowerTitle.includes('cohort') || lowerTitle.includes('caso-control') || lowerTitle.includes('case-control')) {
+          tipoEstudio = 5; log.push('+5 cohorte/caso-control');
         }
       }
-      
-      // 2. Calidad de diseño basada en términos MeSH
+      score += tipoEstudio;
+      // Diseño MeSH (máx. 5 pts)
+      let meshScore = 0;
       if (article.meshTerms && Array.isArray(article.meshTerms)) {
         const qualityIndicators = ['double-blind', 'placebo-controlled', 'multicenter'];
         qualityIndicators.forEach(indicator => {
           if (article.meshTerms.some(term => term.toLowerCase().includes(indicator))) {
-            score += 5;
-            console.log(`Artículo PMID ${article.pmid}: +5 puntos por incluir término de calidad: ${indicator}`);
+            meshScore += 2;
+            log.push('+2 MeSH: ' + indicator);
           }
         });
+        meshScore = Math.min(meshScore, 5);
       }
-      
-      // 3. Actualidad del estudio
-      if (article.publicationDate) {
-        const yearMatch = article.publicationDate.match(/\b(20\d{2})\b/);
-        if (yearMatch) {
-          const year = parseInt(yearMatch[1]);
-          const currentYear = new Date().getFullYear();
-          const yearsOld = currentYear - year;
-          
-          // Artículos más recientes reciben mayor puntuación
-          if (yearsOld <= 2) {
-            score += 20;
-            console.log(`Artículo PMID ${article.pmid}: +20 puntos por ser muy reciente (${year})`);
-          } else if (yearsOld <= 5) {
-            score += 15;
-            console.log(`Artículo PMID ${article.pmid}: +15 puntos por ser reciente (${year})`);
-          } else if (yearsOld <= 10) {
-            score += 5;
-            console.log(`Artículo PMID ${article.pmid}: +5 puntos por ser relativamente reciente (${year})`);
-          }
-        }
+      score += meshScore;
+
+      // 2️⃣ Impacto Científico (30 pts)
+      // RCR (15 pts)
+      let rcr = parseFloat(article.relative_citation_ratio);
+      if (!isNaN(rcr)) {
+        if (rcr > 2.0) { score += 15; log.push('+15 RCR>2.0'); }
+        else if (rcr >= 1.5) { score += 12; log.push('+12 RCR 1.5-2.0'); }
+        else if (rcr >= 1.0) { score += 8; log.push('+8 RCR 1.0-1.49'); }
+        else if (rcr >= 0.5) { score += 4; log.push('+4 RCR 0.5-0.99'); }
+        else { score += 1; log.push('+1 RCR<0.5'); }
       }
-      
-      // 4. Relevancia basada en keywords en título y abstract
+      // NIH Percentil (10 pts)
+      let perc = parseFloat(article.nih_percentile);
+      if (!isNaN(perc)) {
+        if (perc > 90) { score += 10; log.push('+10 NIH%>90'); }
+        else if (perc >= 75) { score += 7; log.push('+7 NIH% 75-90'); }
+        else if (perc >= 50) { score += 4; log.push('+4 NIH% 50-74'); }
+        else { score += 1; log.push('+1 NIH%<50'); }
+      }
+      // Citas por año (5 pts)
+      let cpy = parseFloat(article.citations_per_year);
+      if (!isNaN(cpy)) {
+        if (cpy >= 10) { score += 5; log.push('+5 ≥10 citas/año'); }
+        else if (cpy >= 5) { score += 3; log.push('+3 5-10 citas/año'); }
+        else if (cpy >= 1) { score += 1; log.push('+1 1-4 citas/año'); }
+      }
+
+      // 3️⃣ Actualidad (10 pts)
+      let year = null;
+      if (article.year) year = parseInt(article.year);
+      else if (article.publicationDate) {
+        const yearMatch = String(article.publicationDate).match(/\b(20\d{2})\b/);
+        if (yearMatch) year = parseInt(yearMatch[1]);
+      }
+      if (year) {
+        const currentYear = new Date().getFullYear();
+        const yearsOld = currentYear - year;
+        if (yearsOld <= 2) { score += 10; log.push('+10 ≤2 años'); }
+        else if (yearsOld <= 5) { score += 7; log.push('+7 ≤5 años'); }
+        else if (yearsOld <= 10) { score += 3; log.push('+3 ≤10 años'); }
+      }
+
+      // 4️⃣ Aplicabilidad Clínica (15 pts)
+      let apt = parseFloat(article.apt);
+      if (!isNaN(apt)) {
+        if (apt > 0.8) { score += 15; log.push('+15 APT>0.8'); }
+        else if (apt >= 0.6) { score += 10; log.push('+10 APT 0.6-0.8'); }
+        else if (apt >= 0.4) { score += 5; log.push('+5 APT 0.4-0.59'); }
+        else { score += 1; log.push('+1 APT<0.4'); }
+      }
+
+      // 5️⃣ Relevancia Temática (20 pts)
+      // Coincidencia keywords en título (12 pts)
+      let kwTitle = 0;
       if (article.title) {
+        const lowerTitle = article.title.toLowerCase();
         keywords.forEach(keyword => {
-          if (article.title.toLowerCase().includes(keyword)) {
-            score += 3;
-            console.log(`Artículo PMID ${article.pmid}: +3 puntos por keyword en título: ${keyword}`);
-          }
+          if (lowerTitle.includes(keyword)) kwTitle += 3;
         });
+        kwTitle = Math.min(kwTitle, 12);
+        if (kwTitle > 0) log.push(`+${kwTitle} keywords en título`);
       }
-      
+      score += kwTitle;
+      // Coincidencia keywords en abstract (8 pts)
+      let kwAbs = 0;
       if (article.abstract) {
+        const lowerAbs = article.abstract.toLowerCase();
         keywords.forEach(keyword => {
-          if (article.abstract.toLowerCase().includes(keyword)) {
-            score += 1;
-            console.log(`Artículo PMID ${article.pmid}: +1 punto por keyword en abstract: ${keyword}`);
-          }
+          if (lowerAbs.includes(keyword)) kwAbs += 1;
         });
+        kwAbs = Math.min(kwAbs, 8);
+        if (kwAbs > 0) log.push(`+${kwAbs} keywords en abstract`);
       }
-      
-      // 5. Revistas reconocidas
-      const prestigiousJournals = [
-        'nejm', 'new england', 'lancet', 'jama', 'bmj', 'british medical',
-        'annals of internal medicine', 'nature', 'science', 'cell',
-        'circulation', 'ophthalmology', 'journal of clinical',
-        'american journal', 'journal of', 'archives of'
-      ];
-      
-      if (article.source) {
-        const lowerSource = article.source.toLowerCase();
-        for (const journal of prestigiousJournals) {
-          if (lowerSource.includes(journal)) {
-            score += 7;
-            console.log(`Artículo PMID ${article.pmid}: +7 puntos por revista prestigiosa: ${article.source}`);
+      score += kwAbs;
+
+      // 6️⃣ Prestigio Revista (5 pts)
+      let journal = article.journal || article.source || '';
+      if (journal) {
+        const lowerSource = journal.toLowerCase();
+        for (const j of prestigiousJournals) {
+          if (lowerSource.includes(j)) {
+            score += 5; log.push('+5 revista prestigiosa');
             break;
           }
         }
       }
 
+      // Limitar score máximo a 100
+      score = Math.min(score, 100);
       return {
         ...article,
-        priorityScore: score
+        priorityScore: score,
+        scoreLog: log
       };
     });
-    
+
     // Ordenar artículos por puntuación de mayor a menor
     const prioritizedArticles = scoredArticles.sort((a, b) => b.priorityScore - a.priorityScore);
-    
     // Mostrar resumen de priorización
     console.log(`=== RESUMEN DE PRIORIZACIÓN ===`);
     prioritizedArticles.forEach((article, index) => {
-      console.log(`${index + 1}. PMID: ${article.pmid}, Score: ${article.priorityScore}, Título: ${article.title?.substring(0, 50)}...`);
+      console.log(`${index + 1}. PMID: ${article.pmid}, Score: ${article.priorityScore}, Título: ${article.title?.substring(0, 50)}...`, article.scoreLog);
     });
-    
     return prioritizedArticles;
   },
 
@@ -309,14 +343,38 @@ const scientificQueryController = {
       console.log(`Buscando artículos con la estrategia: "${searchStrategy.substring(0, 100)}..."`);
       const articles = await pubmedService.search(searchStrategy);
       console.log(`Se encontraron ${articles.length} artículos`);
-      
+
+      // === ENRIQUECIMIENTO CON iCite ===
+      // Obtener los PMIDs de los artículos encontrados
+      const pmidList = articles.map(a => a.pmid).filter(Boolean);
+      let iciteDataMap = {};
+      if (pmidList.length > 0) {
+        try {
+          const iciteService = (await import('../services/iciteService.js')).default;
+          const iciteResults = await iciteService.getByPmids(pmidList);
+          // Mapear por PMID para acceso rápido
+          if (Array.isArray(iciteResults)) {
+            iciteDataMap = Object.fromEntries(iciteResults.map(item => [String(item.pmid), item]));
+          } else if (iciteResults && iciteResults.pmid) {
+            iciteDataMap = { [String(iciteResults.pmid)]: iciteResults };
+          }
+        } catch (err) {
+          console.error('Error al consultar/enriquecer con iCite:', err);
+        }
+      }
+      // Enriquecer los artículos con los datos de iCite si existen
+      const enrichedArticles = articles.map(article => {
+        const icite = iciteDataMap[String(article.pmid)];
+        return icite ? { ...article, ...icite } : article;
+      });
+
       // Si se usa IA y hay artículos, priorizar y analizar los más relevantes
-      let analyzedArticles = articles;
-      if (useAI && articles.length > 0) {
+      let analyzedArticles = enrichedArticles;
+      if (useAI && enrichedArticles.length > 0) {
         console.log('Priorizando artículos según relevancia...');
         try {
           // Priorizar artículos según relevancia
-          const prioritizedArticles = scientificQueryController._prioritizeArticles(articles, question);
+          const prioritizedArticles = scientificQueryController._prioritizeArticles(enrichedArticles, question);
           
           // Determinar cuántos artículos analizar en profundidad (máximo 5)
           const maxToAnalyze = Math.min(5, prioritizedArticles.length);

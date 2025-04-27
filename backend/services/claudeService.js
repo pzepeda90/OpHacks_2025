@@ -374,10 +374,12 @@ Pregunta clínica: ${clinicalQuestion}`;
     logInfo(method, `Para pregunta clínica: "${clinicalQuestion.substring(0, 100)}${clinicalQuestion.length > 100 ? '...' : ''}"`);
     
     const { title, authors, abstract, publicationDate, doi, pmid, meshTerms } = article;
-    
-    const authorNames = authors && authors.length > 0 
-      ? authors.map(author => author.name).join(", ")
-      : "No disponible";
+    let authorNames = 'No disponible';
+    if (Array.isArray(authors)) {
+      authorNames = authors.map(a => a.name || a).join(', ');
+    } else if (typeof authors === 'string') {
+      authorNames = authors;
+    }
     
     const meshTermsText = meshTerms && meshTerms.length > 0
       ? meshTerms.join(", ")

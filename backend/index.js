@@ -8,6 +8,7 @@ import config from "./config/index.js";
 // Importar rutas
 import scientificQueryRoute from "./routes/scientificQuery.route.js";
 import claudeRoute from "./routes/claude.route.js";
+import iciteRoute from "./routes/icite.route.js";
 
 // Importar middlewares
 import { requestLogger } from "./middlewares/logger.js";
@@ -35,6 +36,7 @@ console.log('======================================');
 const apiPrefix = config.server.apiPrefix;
 app.use(`${apiPrefix}/scientific-query`, scientificQueryRoute);
 app.use(`${apiPrefix}/claude`, claudeRoute);
+app.use(`${apiPrefix}/icite`, iciteRoute);
 
 // Ruta de prueba para verificar que el servidor está funcionando
 app.get("/", (req, res) => {
