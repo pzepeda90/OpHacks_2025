@@ -297,158 +297,270 @@ const scientificQueryController = {
   },
 
   /**
-   * Procesa una consulta científica
+   * Procesa una consulta científica con un flujo optimizado de 3 etapas
    * @param {Object} req - Objeto de solicitud Express
    * @param {Object} res - Objeto de respuesta Express
    */
   async processQuery(req, res) {
+    const { question, strategy, useAI = true } = req.body;
+    const startTime = Date.now();
+    let processAlert = null;
+    const progressLog = [];
+
+    // Función para registrar el progreso con timestamp
+    const logProgress = (stage, message) => {
+      const timestamp = new Date().toISOString();
+      const logEntry = `[${timestamp}] ${stage}: ${message}`;
+      console.log(logEntry);
+      progressLog.push(logEntry);
+    };
+
     try {
-      const { question, useAI = true } = req.body;
+      logProgress('INICIO', `Procesando consulta: "${question.substring(0, 100)}..."`);
       
-      if (!question) {
-        return res.status(400).json({
-          success: false, 
-          message: 'Se requiere una pregunta científica'
+      // === PRIMER DESTILADO: Generando estrategia PICO ===
+      logProgress('ETAPA 1', 'Generando estrategia de búsqueda PICO');
+      
+      let searchStrategy;
+      let fullResponseStrategy;
+      
+      if (strategy) {
+        // Si el usuario ya proporcionó una estrategia, usarla
+        logProgress('ETAPA 1', 'Usando estrategia proporcionada por el usuario');
+        searchStrategy = strategy;
+        fullResponseStrategy = strategy;
+        
+        // Validar la estrategia proporcionada
+        searchStrategy = this._validateSearchStrategy(strategy);
+      } else if (useAI) {
+        try {
+          // Generar estrategia usando Claude
+          logProgress('ETAPA 1', 'Solicitando estrategia a Claude');
+          const strategyResponse = await claudeService.generateSearchStrategy(question);
+          
+          if (typeof strategyResponse === 'object' && strategyResponse.strategy) {
+            searchStrategy = strategyResponse.strategy;
+            fullResponseStrategy = strategyResponse.fullResponse;
+            logProgress('ETAPA 1', `Estrategia generada (${searchStrategy.length} caracteres)`);
+          } else if (typeof strategyResponse === 'string') {
+            // Compatibilidad con versiones anteriores
+            searchStrategy = strategyResponse;
+            fullResponseStrategy = strategyResponse;
+            logProgress('ETAPA 1', `Estrategia generada en formato antiguo (${searchStrategy.length} caracteres)`);
+          } else {
+            throw new Error('Formato de respuesta de estrategia no reconocido');
+          }
+          
+          // Validar y optimizar la estrategia generada
+          searchStrategy = this._validateSearchStrategy(searchStrategy);
+        } catch (strategyError) {
+          logProgress('ERROR', `Error al generar estrategia: ${strategyError.message}`);
+          // Usar la pregunta directamente como fallback
+          searchStrategy = question;
+          fullResponseStrategy = question;
+          processAlert = 'No se pudo generar una estrategia estructurada. Se utilizó la pregunta clínica como búsqueda.';
+        }
+      } else {
+        // Si no se proporciona estrategia y no se usa AI, usar la pregunta directamente
+        logProgress('ETAPA 1', 'Usando pregunta como estrategia (AI desactivada)');
+        searchStrategy = question;
+        fullResponseStrategy = question;
+      }
+
+      if (!searchStrategy || searchStrategy.trim().length < 5) {
+        throw new Error('Estrategia de búsqueda vacía o inválida');
+      }
+
+      // === SEGUNDO DESTILADO: Búsqueda básica y filtrado por títulos ===
+      logProgress('ETAPA 2', 'Ejecutando búsqueda básica en PubMed (solo títulos)');
+      
+      // Realizar búsqueda básica inicial (no recuperar abstracts todavía)
+      let articles = [];
+      try {
+        articles = await pubmedService.search(searchStrategy);
+        logProgress('ETAPA 2', `Búsqueda completada: ${articles.length} artículos encontrados`);
+      } catch (searchError) {
+        logProgress('ERROR', `Error en búsqueda: ${searchError.message}`);
+        throw new Error(`Error al buscar en PubMed: ${searchError.message}`);
+      }
+      
+      if (!articles || articles.length === 0) {
+        logProgress('ETAPA 2', 'No se encontraron artículos');
+        return res.status(200).json({
+          success: true,
+          message: 'No se encontraron artículos para la estrategia proporcionada',
+          searchStrategy,
+          fullResponseStrategy,
+          articles: [],
+          logs: progressLog
         });
       }
       
-      console.log(`Procesando consulta científica: "${question}"`);
-      console.log(`Uso de IA: ${useAI ? 'Habilitado' : 'Deshabilitado'}`);
+      // Registrar los PMIDs encontrados para diagnóstico
+      logProgress('ETAPA 2', `PMIDs encontrados: ${articles.slice(0, 10).map(a => a.pmid).join(', ')}${articles.length > 10 ? '...' : ''}`);
       
-      // Variable para almacenar la estrategia generada
-      let searchStrategy = '';
-      
-      // Generar estrategia de búsqueda con IA si está habilitado
-      if (useAI) {
-        console.log('Generando estrategia de búsqueda con IA...');
-        try {
-          const claudeResponse = await claudeService.generateSearchStrategy(question);
-          searchStrategy = claudeResponse;
-          console.log(`Estrategia generada: "${searchStrategy.substring(0, 100)}..."`);
-          
-          // Validar y optimizar la estrategia
-          searchStrategy = scientificQueryController._validateSearchStrategy(searchStrategy);
-          
-        } catch (aiError) {
-          console.error('Error al generar estrategia con IA:', aiError);
-          console.log('Usando texto de la pregunta como estrategia de respaldo');
-          searchStrategy = question;
+      // SECOND STAGE: Distillation #1 - Filtrar artículos por título
+      try {
+        if (articles.length > 10) {
+          console.log(`[processQuery] Filtrando artículos por título relevancia (${articles.length} disponibles)`);
+          const startTime = Date.now();
+          // Filtrar artículos por título para reducir tokens en pasos posteriores
+          articles = await claudeService.filterByTitles(articles, question, { limit: 20 });
+          console.log(`[processQuery] Filtrado completado: ${articles.length} artículos seleccionados en ${Date.now() - startTime}ms`);
         }
-      } else {
-        console.log('Usando texto de la pregunta como estrategia');
-        searchStrategy = question;
+      } catch (error) {
+        console.error(`[processQuery] Error al filtrar artículos por título: ${error.message}`);
+        // Continuamos con los artículos que tenemos
       }
       
-      // Ejecutar búsqueda en PubMed
-      console.log(`Buscando artículos con la estrategia: "${searchStrategy.substring(0, 100)}..."`);
-      const articles = await pubmedService.search(searchStrategy);
-      console.log(`Se encontraron ${articles.length} artículos`);
-
-      // === ENRIQUECIMIENTO CON iCite ===
-      // Obtener los PMIDs de los artículos encontrados
-      const pmidList = articles.map(a => a.pmid).filter(Boolean);
-      let iciteDataMap = {};
-      if (pmidList.length > 0) {
-        try {
+      // Ahora recuperar abstracts solo para artículos relevantes
+      logProgress('ETAPA 2', `Recuperando abstracts para ${articles.length} artículos relevantes`);
+      let articlesWithAbstracts = [];
+      
+      try {
+        // Solo recuperar abstracts para los artículos que pasaron el filtro de título
+        if (articles.length > 0) {
+          // Extraer PMIDs
+          const pmids = articles.map(article => article.pmid);
+          logProgress('ETAPA 2', `Solicitando abstracts para ${pmids.length} artículos`);
+          
+          // Obtener artículos completos con abstracts
+          const completeArticles = await pubmedService.getAbstractsForArticles(articles);
+          articlesWithAbstracts = completeArticles.filter(article => article && article.abstract);
+          
+          logProgress('ETAPA 2', `Abstracts recuperados: ${articlesWithAbstracts.length}/${articles.length}`);
+        }
+      } catch (abstractError) {
+        logProgress('ERROR', `Error al recuperar abstracts: ${abstractError.message}`);
+        // Usar artículos sin abstracts si hay error
+        articlesWithAbstracts = articles;
+        processAlert = 'Hubo un problema al recuperar algunos abstracts. Se utilizaron los artículos disponibles.';
+      }
+      
+      // === TERCER DESTILADO: Enriquecimiento con iCite y análisis final ===
+      logProgress('ETAPA 3', 'Enriqueciendo artículos con datos bibliométricos (iCite)');
+      
+      // Enriquecer con iCite
+      let enrichedArticles = articlesWithAbstracts;
+      
+      try {
+        // Extraer PMIDs para consulta a iCite
+        const pmidList = articlesWithAbstracts.map(a => a.pmid).filter(Boolean);
+        
+        if (pmidList.length > 0) {
+          logProgress('ETAPA 3', `Consultando iCite para ${pmidList.length} PMIDs`);
           const iciteService = (await import('../services/iciteService.js')).default;
           const iciteResults = await iciteService.getByPmids(pmidList);
-          // Mapear por PMID para acceso rápido
+          
+          // Crear un mapa para acceso rápido
+          let iciteDataMap = {};
           if (Array.isArray(iciteResults)) {
             iciteDataMap = Object.fromEntries(iciteResults.map(item => [String(item.pmid), item]));
+            logProgress('ETAPA 3', `Datos iCite obtenidos para ${Object.keys(iciteDataMap).length}/${pmidList.length} artículos`);
           } else if (iciteResults && iciteResults.pmid) {
             iciteDataMap = { [String(iciteResults.pmid)]: iciteResults };
+            logProgress('ETAPA 3', `Datos iCite obtenidos para 1 artículo`);
           }
-        } catch (err) {
-          console.error('Error al consultar/enriquecer con iCite:', err);
+          
+          // Enriquecer artículos con datos de iCite
+          enrichedArticles = articlesWithAbstracts.map(article => {
+            const icite = iciteDataMap[String(article.pmid)];
+            return icite ? { ...article, ...icite } : article;
+          });
         }
+      } catch (iciteError) {
+        logProgress('ERROR', `Error al enriquecer con iCite: ${iciteError.message}`);
+        // Continuar con los artículos sin enriquecimiento
+        processAlert = 'No se pudieron obtener datos bibliométricos de iCite. Los resultados pueden ser menos precisos.';
       }
-      // Enriquecer los artículos con los datos de iCite si existen
-      const enrichedArticles = articles.map(article => {
-        const icite = iciteDataMap[String(article.pmid)];
-        return icite ? { ...article, ...icite } : article;
-      });
-
-      // Si se usa IA y hay artículos, priorizar y analizar los más relevantes
-      let analyzedArticles = enrichedArticles;
-      if (useAI && enrichedArticles.length > 0) {
-        console.log('Priorizando artículos según relevancia...');
-        try {
-          // Priorizar artículos según relevancia
-          const prioritizedArticles = scientificQueryController._prioritizeArticles(enrichedArticles, question);
+      
+      // Priorizar artículos
+      logProgress('ETAPA 3', `Calculando relevancia para ${enrichedArticles.length} artículos`);
+      const prioritizedArticles = this._prioritizeArticles(enrichedArticles, question);
+      
+      // Analizar solo los artículos más relevantes
+      const topArticlesToAnalyze = 5;
+      const topArticles = prioritizedArticles.slice(0, topArticlesToAnalyze);
+      logProgress('ETAPA 3', `Seleccionados ${topArticles.length} artículos principales para análisis detallado`);
+      
+      // Analizar artículos principales
+      const analyzedArticles = [];
+      let successfulAnalyses = 0;
+      let failedAnalyses = 0;
+      
+      if (useAI && topArticles.length > 0) {
+        for (let i = 0; i < topArticles.length; i++) {
+          const article = topArticles[i];
+          logProgress('ETAPA 3', `Analizando artículo ${i + 1}/${topArticles.length}: PMID ${article.pmid}`);
           
-          // Determinar cuántos artículos analizar en profundidad (máximo 5)
-          const maxToAnalyze = Math.min(5, prioritizedArticles.length);
-          const articlesToAnalyze = prioritizedArticles.slice(0, maxToAnalyze);
-          const remainingArticles = prioritizedArticles.slice(maxToAnalyze);
-          
-          console.log(`Analizando en profundidad ${maxToAnalyze} artículos prioritarios de ${prioritizedArticles.length} totales`);
-          
-          // Analizar los artículos priorizados
-          let analyzedPriority = [];
-          let failedAnalyses = 0;
-          
-          for (let i = 0; i < articlesToAnalyze.length; i++) {
-            const article = articlesToAnalyze[i];
-            console.log(`Analizando artículo prioritario ${i+1}/${maxToAnalyze}: PMID ${article.pmid} (Score: ${article.priorityScore})`);
-            
-            try {
-              const analysis = await claudeService.analyzeArticle(article, question);
-              
-              analyzedPriority.push({
-                ...article,
-                secondaryAnalysis: analysis,
-                fullyAnalyzed: true
-              });
-              
-              console.log(`Análisis completado para artículo PMID ${article.pmid}`);
-              
-            } catch (analysisError) {
-              console.error(`Error al analizar artículo PMID ${article.pmid}:`, analysisError);
-              failedAnalyses++;
-              
-              analyzedPriority.push({
-                ...article,
-                secondaryAnalysis: `Error en análisis: ${analysisError.message}`,
-                analysisError: true,
-                fullyAnalyzed: false
-              });
-            }
-          }
-          
-          // Combinar los artículos analizados con los no analizados
-          analyzedArticles = [
-            ...analyzedPriority,
-            ...remainingArticles.map(article => ({
+          try {
+            const analysis = await claudeService.analyzeArticle(article, question);
+            analyzedArticles.push({
               ...article,
-              fullyAnalyzed: false,
-              secondaryAnalysis: "Este artículo no fue seleccionado para análisis detallado debido a su menor relevancia para la consulta."
-            }))
-          ];
-          
-          console.log(`Análisis completado: ${analyzedPriority.length - failedAnalyses} exitosos, ${failedAnalyses} fallidos, ${remainingArticles.length} no analizados`);
-          
-        } catch (analysisError) {
-          console.error('Error general al priorizar/analizar artículos:', analysisError);
-          console.log('Devolviendo artículos sin análisis');
+              analysis,
+              analyzed: true
+            });
+            successfulAnalyses++;
+            logProgress('ETAPA 3', `Análisis completado para PMID ${article.pmid}`);
+          } catch (analysisError) {
+            logProgress('ERROR', `Error al analizar PMID ${article.pmid}: ${analysisError.message}`);
+            analyzedArticles.push({
+              ...article,
+              analysis: `Error en el análisis: ${analysisError.message}`,
+              analyzed: false
+            });
+            failedAnalyses++;
+          }
         }
+      } else {
+        logProgress('ETAPA 3', 'Omitiendo análisis detallado (AI desactivada o sin artículos)');
       }
       
-      // Preparar respuesta
-      const response = {
-        success: true,
-        question,
-        searchStrategy,
-        articlesFound: articles.length,
-        articles: analyzedArticles
-      };
+      // Incluir artículos restantes sin análisis
+      const remainingArticles = prioritizedArticles.slice(topArticlesToAnalyze).map(article => ({
+        ...article,
+        analysis: 'Este artículo no fue seleccionado para análisis detallado debido a su menor relevancia.',
+        analyzed: false
+      }));
       
-      console.log('Consulta procesada exitosamente');
-      return res.status(200).json(response);
+      // Combinar todos los artículos para la respuesta final
+      const finalArticles = [...analyzedArticles, ...remainingArticles];
+      
+      // Calcular estadísticas
+      const endTime = Date.now();
+      const processingTime = endTime - startTime;
+      
+      logProgress('FIN', `Procesamiento completado en ${processingTime}ms. Artículos totales: ${finalArticles.length}, Analizados: ${successfulAnalyses}, Fallidos: ${failedAnalyses}`);
+      
+      // Devolver resultado
+      return res.status(200).json({
+        success: true,
+        message: processAlert || 'Consulta procesada exitosamente',
+        searchStrategy,
+        fullResponseStrategy,
+        articles: finalArticles,
+        stats: {
+          totalInitial: articles.length,
+          afterFiltering: articles.length,
+          withAbstracts: articlesWithAbstracts.length,
+          analyzed: successfulAnalyses,
+          failedAnalyses,
+          processingTimeMs: processingTime
+        },
+        logs: progressLog
+      });
     } catch (error) {
-      console.error('Error al procesar consulta científica:', error);
+      const endTime = Date.now();
+      const processingTime = endTime - startTime;
+      
+      logProgress('ERROR', `Error general: ${error.message}`);
+      logProgress('FIN', `Procesamiento terminado con error después de ${processingTime}ms`);
+      
       return res.status(500).json({
         success: false,
-        message: error.message || 'Error interno del servidor'
+        message: 'Error al procesar la consulta',
+        error: error.message,
+        logs: progressLog
       });
     }
   },

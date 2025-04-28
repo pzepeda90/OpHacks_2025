@@ -188,95 +188,85 @@ class ClaudeService {
     logInfo(method, `Generando estrategia para pregunta: "${clinicalQuestion.substring(0, 100)}${clinicalQuestion.length > 100 ? '...' : ''}"`);
     
     // Prompt mejorado para generar estrategia de búsqueda más efectiva
-    const prompt = `Eres Claude, un asistente experto en investigación biomédica, bibliometría y estrategias avanzadas de búsqueda de literatura científica.
+    const prompt = `Eres Claude, un asistente experto en investigación biomédica, bibliometría y estrategias de búsqueda con alta precisión.
 
-Por favor, analiza la siguiente pregunta clínica y desarrolla una estrategia de búsqueda óptima para PubMed que maximice tanto la sensibilidad como la especificidad.
+Por favor, desarrolla una estrategia de búsqueda OPTIMIZADA para PubMed que genere aproximadamente 50-70 resultados altamente relevantes para la siguiente pregunta clínica, minimizando el NNR (Número Necesario a Leer).
 
-INSTRUCCIONES DETALLADAS:
+INSTRUCCIONES PRECISAS:
 
-1. ANÁLISIS INICIAL:
-   - Identifica y extrae los componentes PICO (Población, Intervención, Comparador, Outcome) de la pregunta.
-   - Traduce la pregunta y los conceptos clave al inglés de manera precisa para el contexto biomédico.
-   - Identifica los términos más importantes y conceptos secundarios relevantes.
+1. ANÁLISIS PICO CUANTIFICADO:
+   - Identifica los componentes PICO de la pregunta
+   - Asigna un "peso de relevancia" a cada componente (escala 1-5)
+   - Identifica exactamente qué componentes DEBEN estar presentes para que un artículo sea relevante
 
-2. DESARROLLO DE TÉRMINOS:
-   - Para cada concepto clave, lista:
-     a) Términos MeSH exactos (con sus códigos si es posible)
-     b) Términos de entrada (entry terms) relacionados
-     c) Sinónimos importantes no cubiertos por MeSH
-     d) Variantes terminológicas (incluidas abreviaturas médicas estándar)
-     e) Términos más amplios y más específicos cuando sea relevante
+2. DESARROLLO DE TÉRMINOS PRIORITARIOS:
+   - Para cada concepto clave, identifica:
+     a) Los 2-3 términos MeSH MÁS ESPECÍFICOS y relevantes (evita términos más amplios)
+     b) Los 3-5 términos de texto libre [tiab] MÁS PRECISOS
+     c) Solo las abreviaturas ESTÁNDAR y ampliamente utilizadas
+   - Prioriza precisión sobre exhaustividad
 
-3. ESTRUCTURA DE BÚSQUEDA:
-   - Agrupa términos relacionados con operadores OR
-   - Conecta diferentes conceptos con operadores AND
-   - Utiliza NOT solo cuando sea absolutamente necesario para excluir resultados irrelevantes
-   - Implementa búsquedas por campo específico cuando sea apropiado:
-     * [MeSH] para términos del tesauro médico
-     * [Title/Abstract] o [tiab] para palabras clave en título o resumen
-     * [Majr] para términos MeSH como tema principal
-     * [tw] para búsqueda en text words
-     * [Publication Type] para filtrar por tipo de estudio si es relevante
-     * [Subheading] para subtítulos MeSH específicos
+3. ESTRUCTURA DE BÚSQUEDA CALIBRADA:
+   - Utiliza el enfoque "building blocks" con filtros progresivos:
+     * Bloque 1: Conceptos principales conectados con AND
+     * Bloque 2: Aplica limitadores contextuales precisos 
+     * Bloque 3: Si es necesario, aplica filtros metodológicos o temporales
+   - Calibra la búsqueda para obtener 50-70 resultados
 
-4. ESTRUCTURA DE LA RESPUESTA:
-   Tu respuesta debe incluir:
-   
-   a) ANÁLISIS PICO:
-      - P: [Población identificada]
-      - I: [Intervención identificada]
-      - C: [Comparador identificado (si aplica)]
-      - O: [Outcomes/resultados identificados]
-   
-   b) TRADUCCIÓN:
-      - Traducción precisa al inglés de los términos clave
-   
-   c) MAPA CONCEPTUAL:
-      - Lista de términos MeSH principales para cada concepto
-      - Términos de entrada y sinónimos importantes
-   
-   d) ESTRATEGIA DE BÚSQUEDA COMPLETA:
-      - Presenta la estrategia de búsqueda final con formato adecuado para copiar directamente en PubMed
-      - Usa paréntesis para agrupar términos correctamente
-      - Incluye combinaciones booleanas (AND, OR, NOT) apropiadas
-   
-   e) JUSTIFICACIÓN:
-      - Breve explicación de por qué esta estrategia optimiza sensibilidad y especificidad
+4. ESTIMACIÓN CUANTITATIVA:
+   - Para cada versión de la estrategia, proporciona:
+     * Número estimado de resultados (busca entre 50-70)
+     * Precisión esperada (% de artículos que serán relevantes)
+     * Sensibilidad estimada (% de todos los artículos relevantes que capturará)
+   - Si una estrategia produce >100 resultados, restringe más
+   - Si produce <30 resultados, haz una versión alternativa menos restrictiva
 
-5. FORMATO FINAL:
-   Asegúrate de que la estrategia final esté correctamente estructurada con:
-   - Paréntesis balanceados y adecuadamente anidados
-   - Operadores booleanos en mayúsculas (AND, OR, NOT)
-   - Términos MeSH con el formato correcto (incluyendo [MeSH])
-   - Subtítulos MeSH cuando sea apropiado (ej: "Diabetes Mellitus/therapy"[MeSH])
+5. ESTRUCTURA DE LA RESPUESTA:
+   
+   a) ANÁLISIS PICO PRIORIZADO:
+      - P: [Población] - Relevancia: [1-5]
+      - I: [Intervención] - Relevancia: [1-5]
+      - C: [Comparador] - Relevancia: [1-5]
+      - O: [Outcomes] - Relevancia: [1-5]
+   
+   b) TÉRMINOS PRECISOS (SOLO LOS MÁS ESPECÍFICOS):
+      - Concepto 1: [Lista de SOLO los términos más precisos]
+      - Concepto 2: [Lista de SOLO los términos más precisos]
+      - [etc.]
+   
+   c) ESTRATEGIA PRINCIPAL (OBJETIVO: 50-70 RESULTADOS):
+      - Estrategia completa formateada para PubMed
+      - Número estimado de resultados: [40-80]
+      - Precisión estimada: [%]
+      - Sensibilidad estimada: [%]
+   
+   d) ESTRATEGIA ALTERNATIVA:
+      - Una versión ligeramente diferente si la principal está fuera del rango objetivo
+      - Número estimado de resultados: [40-80]
+   
+   e) VALIDACIÓN PROPUESTA:
+      - Método para validar la sensibilidad/especificidad de la búsqueda
+      - Artículos clave que DEBEN aparecer en los resultados
 
-6. EJEMPLOS DE ESTRATEGIAS DE BÚSQUEDA EFECTIVAS:
+6. EJEMPLOS DE ESTRATEGIAS CALIBRADAS:
    
-   Ejemplo 1:
-   Pregunta: ¿Qué evidencia existe sobre el uso de metotrexato para la prevención de redesprendimiento de retina o la disminución de proliferación vitreoretinal?
-   Estrategia de búsqueda:
-   ("Retinal Detachment"[Mesh] OR "recurrent retinal detachment"[tw] OR "retina redetachment"[tw]) 
-   AND ("Methotrexate"[Mesh] OR "methotrexate"[tw] OR "MTX"[tw]) 
-   AND ("Proliferative Vitreoretinopathy"[Mesh] OR "proliferation vitreoretinal"[tw] OR "PVR"[tw]) 
-   AND ("Prevention"[Mesh] OR "reduce"[tw] OR "control"[tw] OR "prophylaxis"[tw])
-   Resultado: 7 artículos altamente relevantes
+   Ejemplo para pregunta sobre metotrexato en desprendimiento de retina con PVR:
    
-   Ejemplo 2:
-   Pregunta: ¿Cuáles son los factores de riesgo para que progrese la miopía en niños?
-   Estrategia de búsqueda:
-   ("Myopia/epidemiology"[Mesh] OR "myopia progression"[tiab]) 
-   AND ("Risk Factors"[Majr] OR "predictive factors"[tiab]) 
-   AND ("Child"[Mesh] OR "children"[tiab] OR "school-age"[tiab]) 
-   AND ("outdoor time"[tiab] OR "outdoor activity"[tiab] OR "near work"[tiab] OR "genetic factors"[tiab] OR "parental myopia"[tiab] OR "screen time"[tiab] OR "educational level"[tiab] OR "axial length"[tiab] OR "refractive error"[tiab] OR "digital device use"[tiab])
-   Resultado: 11 artículos altamente relevantes
+   ESTRATEGIA CALIBRADA (50-70 RESULTADOS):
+   ("Methotrexate"[Mesh:NoExp] OR methotrexate[ti] OR MTX[ti]) 
+   AND 
+   ("Retinal Detachment"[Majr:NoExp] OR "retinal detachment"[ti]) 
+   AND 
+   ("Proliferative Vitreoretinopathy"[Mesh] OR "PVR"[ti] OR "proliferative vitreoretinopathy"[ti])
    
-   Ejemplo 3:
-   Pregunta: ¿Cuál es la probabilidad de falla primaria de los trasplantes de córnea?
-   Estrategia de búsqueda:
-   ("Corneal Transplantation"[Mesh] OR "keratoplasty"[tiab]) 
-   AND ("Primary Failure"[tiab] OR "Primary Graft Failure"[tiab] OR "PGF"[tiab] OR "early graft failure"[tiab]) 
-   AND ("incidence"[tiab] OR "prevalence"[tiab] OR "rate"[tiab] OR "risk"[tiab])
-   Resultado: 144 artículos altamente relevantes
+   Estimación: ~65 resultados, 80% precisión, 75% sensibilidad
+
+7. TÉCNICAS ESPECÍFICAS PARA CALIBRACIÓN DE RESULTADOS:
+   - Uso de [Majr] para términos MeSH como tema principal
+   - Restricción a títulos [ti] para máxima relevancia
+   - Uso de [Mesh:NoExp] para evitar inclusión de términos más específicos
+   - Combinación precisa de filtros metodológicos cuando sea apropiado
+   - Restricción por campos de alta precisión (título, autor keywords)
 
 Pregunta clínica: ${clinicalQuestion}`;
 
@@ -290,14 +280,25 @@ Pregunta clínica: ${clinicalQuestion}`;
       // Intenta extraer la estrategia de búsqueda final para facilitar su uso
       let extractedStrategy = null;
       
-      // Método 1: Buscar sección "ESTRATEGIA DE BÚSQUEDA COMPLETA"
-      const searchStrategyMatch = response.match(/ESTRATEGIA DE BÚSQUEDA COMPLETA:[\s\S]*?(\(.+?\)(?:\s+(?:AND|OR|NOT)\s+\(.+?\))*)/i);
-      if (searchStrategyMatch && searchStrategyMatch[1]) {
-        extractedStrategy = searchStrategyMatch[1].trim();
-        logInfo(method, `Estrategia extraída (método 1): "${extractedStrategy.substring(0, 100)}${extractedStrategy.length > 100 ? '...' : ''}"`);
-      } 
-      // Método 2: Buscar secuencia de términos MeSH y operadores booleanos
-      else {
+      // Método 1: Buscar sección "ESTRATEGIA PRINCIPAL" o "ESTRATEGIA DE BÚSQUEDA"
+      const estrategiaPatterns = [
+        /ESTRATEGIA PRINCIPAL[^]*?\)([^]*?)(?=ESTRATEGIA ALTERNATIVA|VALIDACIÓN|$)/is,
+        /c\) ESTRATEGIA PRINCIPAL[^]*?\)([^]*?)(?=d\)|$)/is,
+        /ESTRATEGIA CALIBRADA[^]*?(\([^)]*\)(?:\s+(?:AND|OR)\s+\([^)]*\))*)/is,
+        /ESTRATEGIA DE BÚSQUEDA COMPLETA:[\s\S]*?(\(.+?\)(?:\s+(?:AND|OR|NOT)\s+\(.+?\))*)/i
+      ];
+      
+      for (const pattern of estrategiaPatterns) {
+        const match = response.match(pattern);
+        if (match && match[1] && match[1].length > 30) {
+          extractedStrategy = match[1].trim();
+          logInfo(method, `Estrategia extraída (patrones): "${extractedStrategy.substring(0, 100)}${extractedStrategy.length > 100 ? '...' : ''}"`);
+          break;
+        }
+      }
+      
+      // Método 2: Buscar secuencia de términos MeSH y operadores booleanos si el método 1 falló
+      if (!extractedStrategy) {
         try {
           // Buscar un patrón que incluya términos MeSH y operadores booleanos
           const meshPattern = /\(\s*"[^"]+"\s*(?:\[[^\]]+\])(?:\s+OR\s+(?:"[^"]+"\s*(?:\[[^\]]+\])))*\)(?:\s+AND\s+\(.+?\))*/g;
@@ -318,7 +319,7 @@ Pregunta clínica: ${clinicalQuestion}`;
         }
       }
       
-      // Método 3: Buscar en líneas individuales
+      // Método 3: Buscar en líneas individuales si los métodos anteriores fallaron
       if (!extractedStrategy) {
         try {
           const lines = response.split('\n');
@@ -342,7 +343,11 @@ Pregunta clínica: ${clinicalQuestion}`;
         logInfo(method, 'No se pudo extraer automáticamente la estrategia del texto completo');
       }
       
-      return response;
+      // Retornar un objeto con la estrategia extraída y el texto completo
+      return {
+        strategy: extractedStrategy || '',  // La estrategia extraída o cadena vacía si no se encontró
+        fullResponse: response             // La respuesta completa de Claude como respaldo
+      };
     } catch (error) {
       logError(method, 'Error al generar estrategia de búsqueda', error);
       throw error;
@@ -664,6 +669,117 @@ IMPORTANTE:
     logInfo(method, `Resultados: ${successCount} exitosos, ${errorCount} fallidos, ${retriedCount} reintentados`);
     
     return results;
+  }
+
+  /**
+   * Filtra artículos basados en la relevancia de sus títulos respecto a una pregunta clínica
+   * @param {Array} articles - Array de artículos con al menos título y PMID
+   * @param {String} question - Pregunta clínica
+   * @param {Object} options - Opciones adicionales
+   * @param {Number} options.limit - Número máximo de artículos a devolver (default: 20)
+   * @returns {Promise<Array>} - Array de artículos filtrados
+   */
+  async filterByTitles(articles, question, options = {}) {
+    const method = 'filterByTitles';
+    const limit = options.limit || 20;
+    
+    if (!articles || !Array.isArray(articles) || articles.length === 0) {
+      logInfo(method, 'No hay artículos para filtrar');
+      return [];
+    }
+
+    if (!question) {
+      const error = new Error('Se requiere una pregunta clínica para filtrar artículos');
+      logError(method, error.message);
+      throw error;
+    }
+
+    logInfo(method, `Filtrando ${articles.length} artículos por relevancia de título (límite: ${limit})`);
+    
+    // Crear lista de artículos con PMID y título
+    const articlesList = articles.map(article => {
+      return {
+        pmid: article.pmid,
+        title: article.title || 'Sin título'
+      };
+    });
+
+    // Construir el prompt para Claude
+    const prompt = `
+Eres un asistente médico especializado que ayuda a médicos a encontrar información relevante para preguntas clínicas.
+
+PREGUNTA CLÍNICA:
+${question}
+
+TAREA:
+Analiza la siguiente lista de títulos de artículos científicos e identifica los más relevantes para responder la pregunta clínica.
+Selecciona hasta ${limit} artículos que parezcan más relevantes basándote ÚNICAMENTE en sus títulos.
+
+CRITERIOS DE SELECCIÓN:
+- Relevancia directa para la pregunta clínica
+- Especificidad para la condición o intervención mencionada
+- Preferencia por ensayos clínicos, meta-análisis o revisiones sistemáticas
+- Actualidad (si es aparente en el título)
+
+LISTA DE ARTÍCULOS:
+${articlesList.map(a => `PMID: ${a.pmid} - ${a.title}`).join('\n')}
+
+FORMATO DE RESPUESTA:
+Responde ÚNICAMENTE con una lista de PMIDs de los artículos seleccionados, uno por línea, sin explicaciones adicionales.
+Ejemplo:
+12345678
+87654321
+`;
+
+    try {
+      // Llamar a Claude para filtrar artículos
+      const response = await this.generateResponse(prompt);
+      logInfo(method, `Respuesta de Claude recibida, extrayendo PMIDs`);
+
+      // Extraer PMIDs de la respuesta
+      const selectedPMIDs = response
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => /^\d+$/.test(line))
+        .map(pmid => pmid.trim());
+
+      if (selectedPMIDs.length === 0) {
+        logInfo(method, 'No se pudieron extraer PMIDs de la respuesta de Claude, usando fallback');
+        logInfo(method, `Respuesta de Claude: ${response.substring(0, 200)}...`);
+        return articles.slice(0, limit); // Devolver los primeros artículos como fallback
+      }
+
+      logInfo(method, `PMIDs seleccionados por Claude: ${selectedPMIDs.join(', ')}`);
+
+      // Filtrar artículos originales por los PMIDs seleccionados
+      const filteredArticles = articles.filter(article => 
+        selectedPMIDs.includes(article.pmid));
+
+      logInfo(method, `Filtrado completado: ${filteredArticles.length} artículos seleccionados`);
+      
+      // Si no hay coincidencias, devolver los primeros artículos como fallback
+      if (filteredArticles.length === 0) {
+        logInfo(method, 'Ningún PMID seleccionado coincide con los artículos originales, usando fallback');
+        return articles.slice(0, limit);
+      }
+
+      return filteredArticles;
+    } catch (error) {
+      logError(method, `Error al filtrar títulos: ${error.message}`, error);
+      throw new Error(`Error al filtrar títulos: ${error.message}`);
+    }
+  }
+
+  /**
+   * Filtra artículos basados en la relevancia de sus títulos respecto a una pregunta clínica
+   * @param {Array} articles - Array de artículos con al menos título y PMID
+   * @param {String} question - Pregunta clínica
+   * @param {Object} options - Opciones adicionales
+   * @param {Number} options.limit - Número máximo de artículos a devolver (default: 20)
+   * @returns {Promise<Array>} - Array de artículos filtrados
+   */
+  async filterTitlesByRelevance(articles, question, options = {}) {
+    return this.filterByTitles(articles, question, options);
   }
 }
 

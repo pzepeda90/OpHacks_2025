@@ -35,7 +35,7 @@ function emitBatchProgress(processing, total, current) {
   }
 }
 
-export const claudeController = {
+const claudeController = {
   /**
    * Genera una estrategia de búsqueda para PubMed
    * @param {Object} req - Objeto de solicitud Express
@@ -254,40 +254,81 @@ export const claudeController = {
   },
   
   /**
-   * Genera una síntesis crítica de la evidencia científica
-   * @route POST /api/claude/synthesis
+   * Genera síntesis crítica de la evidencia científica
+   * @param {Object} req - Objeto de solicitud Express
+   * @param {Object} res - Objeto de respuesta Express
    */
   generateSynthesis: async (req, res) => {
     try {
       const { clinicalQuestion, articles } = req.body;
       
-      // Validación de datos
       if (!clinicalQuestion) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          message: 'Se requiere una pregunta clínica para la síntesis'
+          message: 'Se requiere una pregunta clínica'
         });
       }
       
       if (!articles || !Array.isArray(articles) || articles.length === 0) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          message: 'Se requiere un array de artículos para la síntesis'
+          message: 'Se requiere un array de artículos con análisis'
         });
       }
-      
-      // Loguear información de la solicitud
-      console.log(`[${new Date().toISOString()}] Solicitud de síntesis para: "${clinicalQuestion}" con ${articles.length} artículos`);
       
       // Generar síntesis
       const synthesis = await claudeService.generateSynthesis(clinicalQuestion, articles);
       
-      return res.status(200).json({ 
+      return res.status(200).json({
         success: true,
-        synthesis 
+        synthesis
       });
     } catch (error) {
-      console.error(`[${new Date().toISOString()}] Error en generateSynthesis:`, error);
+      console.error('Error al generar síntesis:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Error interno del servidor'
+      });
+    }
+  },
+  
+  /**
+   * Filtra artículos basados en la relevancia de sus títulos respecto a una pregunta clínica
+   * @param {Object} req - Objeto de solicitud Express
+   * @param {Object} res - Objeto de respuesta Express
+   */
+  filterByTitles: async (req, res) => {
+    try {
+      const { articles, question, limit } = req.body;
+      
+      if (!articles || !Array.isArray(articles) || articles.length === 0) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Se requiere un array de artículos válido'
+        });
+      }
+      
+      if (!question) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Se requiere una pregunta clínica'
+        });
+      }
+      
+      console.log(`Filtrando ${articles.length} artículos por relevancia de título`);
+      
+      // Llamar al servicio para filtrar artículos
+      const filteredArticles = await claudeService.filterByTitles(articles, question, { 
+        limit: limit || 20 
+      });
+      
+      return res.status(200).json({
+        success: true,
+        count: filteredArticles.length,
+        results: filteredArticles
+      });
+    } catch (error) {
+      console.error('Error al filtrar artículos por título:', error);
       return res.status(500).json({ 
         success: false,
         message: error.message || 'Error interno del servidor'
