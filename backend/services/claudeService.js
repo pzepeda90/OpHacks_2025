@@ -5,6 +5,7 @@
 import axios from 'axios';
 import config from '../config/index.js';
 import { generateSynthesisPrompt } from '../utils/aiPrompts.js';
+import Article from '../models/Article.js';
 
 /**
  * Función para registro de información con timestamp
@@ -84,91 +85,140 @@ class ClaudeService {
     
     const startTime = Date.now();
     
-    try {
-      // Estructura de la solicitud para Claude (Anthropic)
-      const requestData = {
-        model: modelToUse,
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        temperature: temperature,
-        max_tokens: 2048
-      };
-      
-      // Endpoint de generación de texto de Claude
-      const url = `${this.baseUrl}/v1/messages`;
-      
-      logInfo(method, `Enviando solicitud a ${url}`);
-      
-      // Aumentar el tiempo de espera a 45 segundos
-      const response = await axios.post(url, requestData, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        timeout: 45000 // 45 segundos de timeout
-      });
-      
-      const endTime = Date.now();
-      const durationMs = endTime - startTime;
-      
-      logInfo(method, `Respuesta recibida después de ${durationMs}ms`);
-      
-      if (response.data && 
-          response.data.content && 
-          response.data.content.length > 0 && 
-          response.data.content[0].text) {
-        
-        const responseText = response.data.content[0].text;
-        logInfo(method, `Respuesta exitosa. Longitud: ${responseText.length} caracteres`);
-        
-        // Registrar algunos metadatos adicionales si están disponibles
-        if (response.data.usage) {
-          logInfo(method, `Uso de tokens: ${JSON.stringify(response.data.usage)}`);
+    // Implementar una función de reintento con backoff exponencial
+    const maxRetries = options.maxRetries || 3;
+    let attempt = 0;
+    let delay = 2000; // Retraso inicial de 2 segundos
+    let lastError = null;
+    
+    while (attempt < maxRetries) {
+      try {
+        // Si no es el primer intento, esperar antes de reintentar
+        if (attempt > 0) {
+          logInfo(method, `Reintento ${attempt+1}/${maxRetries} después de ${delay/1000} segundos debido a error: ${lastError.message}`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          // Duplicar el tiempo de espera para el próximo intento (backoff exponencial)
+          delay = Math.min(delay * 2, 120000); // Máximo 2 minutos de espera
         }
         
-        return responseText;
-      } else {
-        const error = new Error('Formato de respuesta inválido de Claude');
-        logError(method, error.message, response.data);
-        throw error;
-      }
-    } catch (error) {
-      const endTime = Date.now();
-      const durationMs = endTime - startTime;
-      
-      // Mensajes de error más específicos según el tipo de error
-      let errorMessage = `Error después de ${durationMs}ms: `;
-      
-      if (error.code === 'ECONNABORTED') {
-        errorMessage += 'Tiempo de espera agotado. La API tardó demasiado en responder.';
-      } else if (error.response && error.response.status === 429) {
-        errorMessage += 'Demasiadas solicitudes. Se ha superado el límite de rate limit de la API.';
-      } else if (error.response && error.response.status === 500) {
-        errorMessage += 'Error interno del servidor de Claude. Intente nuevamente más tarde.';
-      } else if (error.response && error.response.status === 503) {
-        errorMessage += 'Servicio no disponible. La API de Claude puede estar experimentando problemas.';
-      } else {
-        errorMessage += error.message;
-      }
-      
-      logError(method, errorMessage, error);
-      
-      // Mostrar información detallada del error
-      if (error.response) {
-        logError(method, `Estado HTTP: ${error.response.status}`, {
-          status: error.response.status,
-          data: error.response.data
+        // Estructura de la solicitud para Claude (Anthropic)
+        const requestData = {
+          model: modelToUse,
+          messages: [
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          temperature: temperature,
+          max_tokens: 2048
+        };
+        
+        // Endpoint de generación de texto de Claude
+        const url = `${this.baseUrl}/v1/messages`;
+        
+        logInfo(method, `Enviando solicitud a ${url}`);
+        
+        // Aumentar el tiempo de espera a 45 segundos
+        const response = await axios.post(url, requestData, {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': this.apiKey,
+            'anthropic-version': '2023-06-01'
+          },
+          timeout: 45000 // 45 segundos de timeout
         });
+        
+        const endTime = Date.now();
+        const durationMs = endTime - startTime;
+        
+        logInfo(method, `Respuesta recibida después de ${durationMs}ms`);
+        
+        if (response.data && 
+            response.data.content && 
+            response.data.content.length > 0 && 
+            response.data.content[0].text) {
+          
+          const responseText = response.data.content[0].text;
+          logInfo(method, `Respuesta exitosa. Longitud: ${responseText.length} caracteres`);
+          
+          // Registrar algunos metadatos adicionales si están disponibles
+          if (response.data.usage) {
+            logInfo(method, `Uso de tokens: ${JSON.stringify(response.data.usage)}`);
+          }
+          
+          return responseText;
+        } else {
+          const error = new Error('Formato de respuesta inválido de Claude');
+          logError(method, error.message, response.data);
+          throw error;
+        }
+      } catch (error) {
+        const endTime = Date.now();
+        const durationMs = endTime - startTime;
+        lastError = error;
+        
+        // Mensajes de error más específicos según el tipo de error
+        let errorMessage = `Error después de ${durationMs}ms: `;
+        
+        if (error.code === 'ECONNABORTED') {
+          errorMessage += 'Tiempo de espera agotado. La API tardó demasiado en responder.';
+        } else if (error.response && error.response.status === 429) {
+          errorMessage += 'Demasiadas solicitudes. Se ha superado el límite de rate limit de la API.';
+          // Para errores de rate limit especialmente, obtener info de headers si está disponible
+          if (error.response && error.response.headers) {
+            const retryAfter = error.response.headers['retry-after'];
+            const resetTime = error.response.headers['anthropic-ratelimit-tokens-reset'];
+            
+            if (retryAfter) {
+              logInfo(method, `API sugiere reintentar después de ${retryAfter} segundos`);
+              // Usar el valor sugerido por la API para el próximo retraso, convertido a ms
+              delay = (parseInt(retryAfter) + 5) * 1000; // Añadir 5 segundos extra por seguridad
+            }
+            
+            if (resetTime) {
+              logInfo(method, `Rate limit se restablecerá en: ${resetTime}`);
+            }
+          }
+          
+          // Para rate limit, asegurarse de que esperamos bastante tiempo en el próximo intento
+          if (attempt === maxRetries - 1) {
+            throw new Error(errorMessage); // Último intento, propagar el error
+          }
+          
+          // En intentos intermedios, continuar con el ciclo para reintentar
+          attempt++;
+          continue;
+        } else if (error.response && error.response.status === 500) {
+          errorMessage += 'Error interno del servidor de Claude. Intente nuevamente más tarde.';
+        } else if (error.response && error.response.status === 503) {
+          errorMessage += 'Servicio no disponible. La API de Claude puede estar experimentando problemas.';
+        } else {
+          errorMessage += error.message;
+        }
+        
+        logError(method, errorMessage, error);
+        
+        // Mostrar información detallada del error
+        if (error.response) {
+          logError(method, `Estado HTTP: ${error.response.status}`, {
+            status: error.response.status,
+            data: error.response.data
+          });
+        }
+        
+        // Si no es un error de rate limit o es el último intento, propagar el error
+        if (!(error.response && error.response.status === 429) || attempt === maxRetries - 1) {
+          throw new Error(errorMessage);
+        }
+        
+        // Incrementar el número de intentos para continuar el ciclo
+        attempt++;
       }
-      
-      // Propagar el error con mensaje mejorado
-      throw new Error(errorMessage);
     }
+    
+    // Este punto no debería alcanzarse normalmente
+    throw lastError || new Error('Falló después de múltiples intentos');
   }
   
   /**
@@ -391,7 +441,7 @@ Pregunta clínica: ${clinicalQuestion}`;
       : "No disponible";
 
     // Construir el prompt para análisis de artículo como tarjeta visual
-    const prompt = `Eres Claude, un asistente experto en análisis crítico de literatura científica biomédica.
+    const detailedPrompt = `Eres Claude, un asistente experto en análisis crítico de literatura científica biomédica.
 
 Analiza el siguiente artículo científico en relación a la pregunta clínica proporcionada.
 
@@ -481,34 +531,102 @@ IMPORTANTE:
 4. COMPLETA todas las secciones requeridas con información concisa y clara.
 5. MANTÉN el análisis breve pero exhaustivo, con énfasis en los puntos más relevantes.`;
 
-    try {
-      // Añadir un retraso aleatorio entre 1-3 segundos para evitar superar el rate limit
-      const randomDelay = Math.floor(Math.random() * 2000) + 1000;
-      logInfo(method, `Añadiendo retraso de ${randomDelay}ms antes de solicitar análisis para evitar rate limiting`);
-      await new Promise(resolve => setTimeout(resolve, randomDelay));
+    // Construir un prompt simplificado para usar en caso de fallo
+    const simplifiedPrompt = `Analiza brevemente el siguiente artículo en relación a esta pregunta clínica:
+Pregunta: ${clinicalQuestion}
+Título: ${title}
+Abstract: ${abstract}
+
+Genera un análisis conciso con este formato HTML exacto:
+
+<div class="card-analysis">
+  <div class="card-header">
+    <h3>ANÁLISIS DE EVIDENCIA</h3>
+    <div class="badges">
+      <span class="badge quality">★★☆☆☆</span>
+      <span class="badge type">Resumen</span>
+    </div>
+  </div>
+  <div class="card-section">
+    <h4>RESUMEN CLÍNICO</h4>
+    <p>[Breve resumen y relevancia]</p>
+  </div>
+  <div class="card-section">
+    <h4>RELEVANCIA CLÍNICA</h4>
+    <p>[Aplicabilidad de resultados]</p>
+  </div>
+</div>`;
+
+    // Función para reintento con backoff exponencial
+    const retryWithExponentialBackoff = async (prompt, maxRetries = 3) => {
+      let lastError;
       
-      logInfo(method, `Longitud del prompt generado: ${prompt.length} caracteres`);
-      const response = await this.generateResponse(prompt);
-      logInfo(method, 'Análisis de artículo generado exitosamente');
-      return response;
-    } catch (error) {
-      // Si hay un error de rate limit, reintentamos con un retraso mayor
-      if (error.message && error.message.includes('rate limit')) {
-        logInfo(method, 'Rate limit alcanzado. Reintentando después de un retraso...');
-        await new Promise(resolve => setTimeout(resolve, 5000)); // 5 segundos de espera
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
-          logInfo(method, 'Reintentando solicitud de análisis...');
-          const response = await this.generateResponse(prompt);
-          logInfo(method, 'Análisis de artículo generado exitosamente en segundo intento');
+          // Añadir retraso exponencial entre intentos (excepto el primero)
+          if (attempt > 0) {
+            const delay = Math.pow(2, attempt) * 3000 + (Math.random() * 1000);
+            logInfo(method, `Reintento ${attempt+1}/${maxRetries} después de ${Math.round(delay/1000)} segundos`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          } else if (attempt === 0) {
+            // Pequeño retraso aleatorio inicial
+            const randomDelay = Math.floor(Math.random() * 2000) + 1000;
+            logInfo(method, `Añadiendo retraso de ${randomDelay}ms antes de solicitar análisis`);
+            await new Promise(resolve => setTimeout(resolve, randomDelay));
+          }
+          
+          logInfo(method, `Intento ${attempt+1}/${maxRetries}: Longitud del prompt: ${prompt.length} caracteres`);
+          const response = await this.generateResponse(prompt, {
+            temperature: 0.5 + (attempt * 0.1) // Aumentar ligeramente la temperatura en cada reintento
+          });
+          logInfo(method, `Análisis generado exitosamente en intento ${attempt+1}`);
           return response;
-        } catch (retryError) {
-          logError(method, 'Error en segundo intento de análisis', retryError);
-          throw retryError;
+        } catch (error) {
+          lastError = error;
+          logError(method, `Error en intento ${attempt+1}: ${error.message}`);
+          
+          // Si no es un error de rate limit o si estamos en el último intento, no continuar
+          if ((!error.message || 
+              (!error.message.includes('rate limit') && 
+               !error.message.includes('timeout') && 
+               !error.message.includes('429'))) && 
+              attempt === maxRetries - 1) {
+            throw error;
+          }
         }
       }
       
-      logError(method, 'Error al analizar artículo', error);
-      throw error;
+      // Si llegamos aquí, todos los reintentos fallaron
+      throw lastError || new Error('Todos los intentos fallaron');
+    };
+
+    try {
+      // Primer intento con el prompt detallado
+      return await retryWithExponentialBackoff(detailedPrompt, 3);
+    } catch (mainError) {
+      logError(method, `Fallo en análisis con prompt detallado: ${mainError.message}. Intentando con prompt simplificado.`);
+      
+      try {
+        // Si falla, intentar con el prompt simplificado
+        return await retryWithExponentialBackoff(simplifiedPrompt, 2);
+      } catch (fallbackError) {
+        logError(method, `Error en análisis con prompt simplificado: ${fallbackError.message}`);
+        
+        // Si todo falla, devolver un mensaje de error en formato HTML compatible
+        return `<div class="card-analysis">
+  <div class="card-header">
+    <h3>ANÁLISIS DE EVIDENCIA</h3>
+    <div class="badges">
+      <span class="badge quality">★☆☆☆☆</span>
+      <span class="badge type">Error</span>
+    </div>
+  </div>
+  <div class="card-section">
+    <h4>ERROR DE ANÁLISIS</h4>
+    <p>No fue posible analizar este artículo. Error: ${fallbackError.message || 'Desconocido'}</p>
+  </div>
+</div>`;
+      }
     }
   }
 
@@ -578,97 +696,159 @@ IMPORTANTE:
     logInfo(method, `Iniciando análisis de lote con ${articles.length} artículos`);
     logInfo(method, `Pregunta clínica: "${clinicalQuestion.substring(0, 100)}${clinicalQuestion.length > 100 ? '...' : ''}"`);
     
-    // Configuración para evitar rate limiting
-    const concurrencyLimit = 2; // Máximo 2 artículos simultáneos
-    const delayBetweenRequests = 5000; // 5 segundos entre solicitudes
-    
-    // Función para procesar cada artículo con gestión de errores
-    const processArticle = async (article, index) => {
+    // Filtrar artículos que no sean válidos para análisis
+    const validArticles = articles.filter(article => {
       try {
-        // Aplicar retraso para evitar rate limiting (excepto para el primer artículo)
-        if (index > 0) {
-          const delay = delayBetweenRequests + (Math.random() * 2000); // Añadir aleatoriedad
-          logInfo(method, `Esperando ${Math.round(delay/1000)} segundos antes de procesar artículo ${index+1}/${articles.length}`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-        
-        logInfo(method, `Procesando artículo ${index+1}/${articles.length}: "${article.title?.substring(0, 50) || 'Sin título'}..."`);
-        
+        const articleObj = new Article(article);
+        return articleObj.validateForAnalysis();
+      } catch (error) {
+        logError(method, `Error al validar artículo: ${error.message}`);
+        return false;
+      }
+    });
+    
+    logInfo(method, `De ${articles.length} artículos, ${validArticles.length} son válidos para análisis`);
+    
+    // Si no hay artículos válidos, devolver el array original con mensajes de error
+    if (validArticles.length === 0) {
+      logInfo(method, 'No hay artículos válidos para analizar, devolviendo array original con mensajes de error');
+      return articles.map(article => ({
+        ...article,
+        secondaryAnalysis: `Error: El artículo no contiene suficiente información para ser analizado. Se requiere un título válido, abstract extenso e identificador.`,
+        error: true,
+        analyzed: false
+      }));
+    }
+    
+    // ---- NUEVA IMPLEMENTACIÓN PARA MANEJAR RATE LIMITING ----
+    // Incrementar significativamente el tiempo entre solicitudes
+    const delayBetweenRequests = 20000; // 20 segundos entre solicitudes (incrementado desde 10s)
+    
+    // Función para procesar cada artículo con gestión mejorada de errores y rate limits
+    const processArticle = async (article, index) => {
+      logInfo(method, `Procesando artículo ${index+1}/${validArticles.length}: "${article.title?.substring(0, 50) || 'Sin título'}..."`);
+      
+      // Siempre aplicar retraso para evitar rate limiting (excepto el primer artículo)
+      if (index > 0) {
+        // Incrementar la aleatoriedad para distribuir mejor las solicitudes
+        const delay = delayBetweenRequests + (Math.random() * 10000); // Añadir hasta 10 segundos adicionales aleatorios
+        logInfo(method, `Esperando ${Math.round(delay/1000)} segundos antes de procesar artículo ${index+1}/${validArticles.length}`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      
+      try {
         // Intentar analizar el artículo
         const analysis = await this.analyzeArticle(article, clinicalQuestion);
         
-        logInfo(method, `Artículo ${index+1}/${articles.length} analizado correctamente`);
+        logInfo(method, `Artículo ${index+1}/${validArticles.length} analizado correctamente`);
         return {
           ...article,
           secondaryAnalysis: analysis,
           analyzed: true
         };
       } catch (error) {
-        logError(method, `Error al analizar artículo ${index+1}/${articles.length}: ${error.message}`);
-        
-        // Reintentar una vez si es un error de rate limit o timeout
-        if ((error.message && (error.message.includes('rate limit') || error.message.includes('timeout'))) || 
-            (error.response && error.response.status === 429)) {
-          logInfo(method, `Reintentando artículo ${index+1}/${articles.length} después de pausa extendida`);
+        // Verificar si es un error de rate limit específicamente
+        if (error.message && (error.message.includes('rate limit') || error.message.includes('429'))) {
+          logError(method, `Error de rate limit en artículo ${index+1}/${validArticles.length}. Esperando antes de reintentar.`);
           
-          // Pausa más larga para el reintento
-          await new Promise(resolve => setTimeout(resolve, 15000));
+          // Esperar un tiempo significativo antes de reintentar (1-2 minutos)
+          const retryDelay = 60000 + (Math.random() * 60000);
+          logInfo(method, `Esperando ${Math.round(retryDelay/1000)} segundos antes de reintentar debido a rate limit...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
           
           try {
+            // Reintentar una vez después de esperar
+            logInfo(method, `Reintentando análisis para artículo ${index+1}/${validArticles.length}...`);
             const analysis = await this.analyzeArticle(article, clinicalQuestion);
-            logInfo(method, `Reintento exitoso para artículo ${index+1}/${articles.length}`);
+            
+            logInfo(method, `Reintento exitoso para artículo ${index+1}/${validArticles.length}`);
             return {
               ...article,
               secondaryAnalysis: analysis,
-              analyzed: true,
-              retried: true
+              analyzed: true
             };
           } catch (retryError) {
-            logError(method, `Reintento fallido para artículo ${index+1}/${articles.length}: ${retryError.message}`);
+            logError(method, `Reintento fallido para artículo ${index+1}/${validArticles.length}: ${retryError.message}`);
             return {
               ...article,
-              secondaryAnalysis: `Error: No fue posible analizar este artículo. ${retryError.message}`,
-              error: true
+              secondaryAnalysis: `Error: No fue posible analizar este artículo después de múltiples intentos. El servicio puede estar experimentando alta demanda. Error: ${retryError.message}`,
+              error: true,
+              analyzed: false
             };
           }
+        } else {
+          // Otro tipo de error
+          logError(method, `Error al analizar artículo ${index+1}/${validArticles.length}: ${error.message}`);
+          return {
+            ...article,
+            secondaryAnalysis: `Error: No fue posible analizar este artículo. ${error.message}`,
+            error: true,
+            analyzed: false
+          };
         }
-        
-        return {
-          ...article,
-          secondaryAnalysis: `Error: No fue posible analizar este artículo. ${error.message}`,
-          error: true
-        };
       }
     };
     
-    // Procesar artículos con límite de concurrencia
+    // Procesar artículos de forma secuencial para evitar sobrecargar la API
     const results = [];
     const startTime = Date.now();
     
-    // Dividir los artículos en lotes según el límite de concurrencia
-    for (let i = 0; i < articles.length; i += concurrencyLimit) {
-      const batch = articles.slice(i, i + concurrencyLimit);
-      const batchPromises = batch.map((article, batchIndex) => 
-        processArticle(article, i + batchIndex)
-      );
-      
-      // Esperar a que se complete el lote actual antes de procesar el siguiente
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults);
-      
-      logInfo(method, `Completado lote ${Math.floor(i/concurrencyLimit) + 1}/${Math.ceil(articles.length/concurrencyLimit)}`);
+    // Procesamiento secuencial para evitar rate limits
+    for (let i = 0; i < validArticles.length; i++) {
+      // Procesar un solo artículo a la vez
+      try {
+        const result = await processArticle(validArticles[i], i);
+        results.push(result);
+        
+        // Registrar progreso
+        logInfo(method, `Completado artículo ${i+1}/${validArticles.length}`);
+        
+        // Si quedan más artículos, mostrar porcentaje completado
+        if (i < validArticles.length - 1) {
+          const percentComplete = Math.round(((i + 1) / validArticles.length) * 100);
+          logInfo(method, `Progreso: ${percentComplete}% completado (${i+1}/${validArticles.length})`);
+          
+          // Verificar si estamos cerca del límite de artículos, añadir pausa adicional para asegurar reseteo de rate limits
+          if (validArticles.length > 3 && i > 0 && i % 3 === 0) {
+            logInfo(method, `Pausa preventiva de rate limit después de ${i+1} artículos`);
+            await new Promise(resolve => setTimeout(resolve, 60000)); // Pausa de 1 minuto cada 3 artículos
+          }
+        }
+      } catch (error) {
+        // Manejar errores inesperados en el nivel más alto
+        logError(method, `Error inesperado al procesar lote para artículo ${i+1}: ${error.message}`);
+        results.push({
+          ...validArticles[i],
+          secondaryAnalysis: `Error: Ocurrió un error inesperado al analizar este artículo. ${error.message}`,
+          error: true,
+          analyzed: false
+        });
+      }
     }
+    
+    // Añadir artículos inválidos con mensaje de error
+    const invalidArticles = articles.filter(a1 => !validArticles.some(a2 => a2.pmid === a1.pmid));
+    const invalidResults = invalidArticles.map(article => ({
+      ...article,
+      secondaryAnalysis: `Error: El artículo no contiene suficiente información para ser analizado.`,
+      error: true,
+      analyzed: false,
+      invalid: true
+    }));
+    
+    // Combinar resultados de artículos válidos e inválidos
+    const finalResults = [...results, ...invalidResults];
     
     const endTime = Date.now();
     const totalTime = (endTime - startTime) / 1000;
-    const successCount = results.filter(article => article.analyzed && !article.error).length;
-    const errorCount = results.filter(article => article.error).length;
-    const retriedCount = results.filter(article => article.retried).length;
+    const successCount = finalResults.filter(article => article.analyzed && !article.error).length;
+    const errorCount = finalResults.filter(article => article.error).length;
+    const invalidCount = finalResults.filter(article => article.invalid).length;
     
     logInfo(method, `Análisis de lote completado en ${totalTime.toFixed(1)} segundos`);
-    logInfo(method, `Resultados: ${successCount} exitosos, ${errorCount} fallidos, ${retriedCount} reintentados`);
+    logInfo(method, `Resultados: ${successCount} exitosos, ${errorCount} fallidos, ${invalidCount} inválidos`);
     
-    return results;
+    return finalResults;
   }
 
   /**

@@ -332,6 +332,20 @@ class NotificationService {
       this.showProcessSteps(steps, newCurrentStep, customMessage);
     }
   }
+
+  /**
+   * Muestra una notificación informativa
+   * @param {string} title - Título de la notificación
+   * @param {string} message - Mensaje de la notificación
+   */
+  showInfo(title, message) {
+    return Swal.fire({
+      title: title,
+      html: message,
+      icon: 'info',
+      confirmButtonText: 'Entendido'
+    });
+  }
 }
 
 export default new NotificationService(); 

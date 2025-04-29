@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">6.66% </span>
+                <span class="strong">73.33% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>1/15</span>
+                <span class='fraction'>11/15</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">80% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/10</span>
+                <span class='fraction'>8/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">33.33% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/3</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">7.69% </span>
+                <span class="strong">76.92% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>1/13</span>
+                <span class='fraction'>10/13</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line medium'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -112,15 +112,15 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -145,17 +145,17 @@ class ICiteService {
    * @param {string|string[]} pmids - Un PMID o un array de PMIDs
    * @returns {Promise&lt;ICite|ICite[]&gt;}
    */
-<span class="fstat-no" title="function not covered" >  as</span>ync getByPmids(pmids) {
-<span class="cstat-no" title="statement not covered" >    if (!pmids) <span class="cstat-no" title="statement not covered" >throw new Error('Se requiere al menos un PMID');</span></span>
-    let pmidList = <span class="cstat-no" title="statement not covered" >Array.isArray(pmids) ? pmids : [pmids];</span>
-    const url = <span class="cstat-no" title="statement not covered" >`${this.baseUrl}/pubs`;</span>
-    const params = <span class="cstat-no" title="statement not covered" >{ pmids: pmidList.join(',') };</span>
-<span class="cstat-no" title="statement not covered" >    try {</span>
-      const response = <span class="cstat-no" title="statement not covered" >await axios.get(url, { params });</span>
-<span class="cstat-no" title="statement not covered" >      if (response.data &amp;&amp; Array.isArray(response.data.data)) {</span>
-        const results = <span class="cstat-no" title="statement not covered" >response.data.data.map(<span class="fstat-no" title="function not covered" >it</span>em =&gt; <span class="cstat-no" title="statement not covered" >new ICite(item))</span>;</span>
-<span class="cstat-no" title="statement not covered" >        return Array.isArray(pmids) ? results : results[0];</span>
-      } else {
+  async getByPmids(pmids) {
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (!pmids) <span class="cstat-no" title="statement not covered" >throw new Error('Se requiere al menos un PMID');</span>
+    let pmidList = Array.isArray(pmids) ? pmids : [pmids];
+    const url = `${this.baseUrl}/pubs`;
+    const params = { pmids: pmidList.join(',') };
+    try {
+      const response = await axios.get(url, { params });
+      if (response.data &amp;&amp; Array.isArray(response.data.data)) {
+        const results = response.data.data.map(item =&gt; new ICite(item));
+        return Array.isArray(pmids) ? results : results[0];
+      } else <span class="missing-if-branch" title="else path not taken" >E</span>{
 <span class="cstat-no" title="statement not covered" >        throw new Error('Respuesta inesperada de la API de iCite');</span>
       }
     } catch (error) {
@@ -172,7 +172,7 @@ export default new ICiteService(); </pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-04-28T20:22:49.363Z
+                at 2025-04-29T01:22:16.697Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

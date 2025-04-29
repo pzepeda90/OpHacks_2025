@@ -131,6 +131,27 @@ class Article {
   }
   
   /**
+   * Valida que el artículo tenga los campos mínimos necesarios para ser analizado por Claude
+   * @returns {boolean} - true si el artículo tiene suficiente información para análisis
+   */
+  validateForAnalysis() {
+    // Verificar que hay un título significativo (no genérico)
+    const hasValidTitle = this.title && this.title !== 'Sin título' && this.title.length > 5;
+    
+    // Verificar que hay un abstract con suficiente contenido
+    const hasValidAbstract = this.abstract && this.abstract.length > 50 && this.abstract !== 'Abstract no disponible';
+    
+    // Verificar que tiene al menos un identificador
+    const hasIdentifier = Boolean(this.pmid || this.doi);
+    
+    // Verificar que tiene fecha de publicación
+    const hasPublicationDate = Boolean(this.publicationDate);
+    
+    // Resultado final: debe tener título, abstract e identificador
+    return hasValidTitle && hasValidAbstract && hasIdentifier;
+  }
+  
+  /**
    * Obtiene un resumen conciso del artículo
    * @returns {Object} - Resumen del artículo
    */

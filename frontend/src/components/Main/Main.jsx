@@ -219,18 +219,36 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       // PASO 2: Si IA está habilitada, generamos estrategia de búsqueda con IA
       logInfo("PASO 2: Generando estrategia de búsqueda con IA", { iaEnabled });
       let searchStrategyText = "";
+      let fullResponseText = "";
       
       if (iaEnabled) {
         try {
           // Intentamos usar el servicio real de IA
           logInfo("Solicitando estrategia a Claude", { query: searchQuery });
           const startTime = Date.now();
-          searchStrategyText = await aiService.generateSearchStrategy(searchQuery);
+          const strategyResponse = await aiService.generateSearchStrategy(searchQuery);
           const endTime = Date.now();
           logInfo(`Estrategia generada en ${endTime - startTime}ms`);
-          logInfo("Contenido de la estrategia:", searchStrategyText);
           
-          setSearchStrategy(searchStrategyText);
+          // Manejar tanto formato de objeto como string directa
+          if (strategyResponse && typeof strategyResponse === 'object') {
+            searchStrategyText = strategyResponse.strategy || "";
+            fullResponseText = strategyResponse.fullResponse || "";
+            logInfo("Estrategia recibida en formato objeto", {
+              strategyLength: searchStrategyText.length,
+              fullResponseLength: fullResponseText.length
+            });
+          } else {
+            // Compatibilidad con formato anterior
+            searchStrategyText = strategyResponse || "";
+            fullResponseText = strategyResponse || "";
+            logInfo("Estrategia recibida en formato string", {
+              length: searchStrategyText.length
+            });
+          }
+          
+          logInfo("Contenido de la estrategia:", searchStrategyText);
+          setSearchStrategy(fullResponseText); // Guardar la respuesta completa para mostrarla en la UI
         } catch (error) {
           logError("Error al generar estrategia de búsqueda", error);
           setError({
@@ -284,9 +302,14 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       let pubmedResults = null;
       
       try {
+        // Asegurarnos de que searchStrategyText sea una string antes de usar substring
+        const strategyPreview = typeof searchStrategyText === 'string' && searchStrategyText.length > 0 
+          ? searchStrategyText.substring(0, 100) + "..." 
+          : "No disponible";
+          
         logInfo("Iniciando búsqueda en PubMed", {
           query: searchQuery,
-          strategy: searchStrategyText ? searchStrategyText.substring(0, 100) + "..." : "No disponible",
+          strategy: strategyPreview,
           useAI: iaEnabled
         });
         
@@ -383,7 +406,7 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
               query: searchQuery,
               useAI: iaEnabled,
               resultsCount: realArticles.length,
-              strategy: searchStrategyText
+              strategy: fullResponseText || searchStrategyText // Usar respuesta completa si existe
             });
             logInfo("Búsqueda guardada en historial");
             

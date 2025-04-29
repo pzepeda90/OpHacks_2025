@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">5.26% </span>
+                <span class="strong">68.42% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>1/19</span>
+                <span class='fraction'>13/19</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">53.84% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/13</span>
+                <span class='fraction'>7/13</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">5.26% </span>
+                <span class="strong">68.42% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>1/19</span>
+                <span class='fraction'>13/19</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line medium'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -117,21 +117,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -139,13 +137,15 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -161,17 +161,17 @@ const iciteController = {
    * @param {Object} req - Express request
    * @param {Object} res - Express response
    */
-  getByPmid: <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {
-<span class="cstat-no" title="statement not covered" >    try {</span>
-      const { pmid } = <span class="cstat-no" title="statement not covered" >req.params;</span>
-<span class="cstat-no" title="statement not covered" >      if (!pmid) {</span>
+  getByPmid: async (req, res) =&gt; {
+    try {
+      const { pmid } = req.params;
+      <span class="missing-if-branch" title="if path not taken" >I</span>if (!pmid) {
 <span class="cstat-no" title="statement not covered" >        return res.status(400).json({ success: false, message: 'Se requiere un PMID' });</span>
       }
-      const data = <span class="cstat-no" title="statement not covered" >await iciteService.getByPmids(pmid);</span>
-<span class="cstat-no" title="statement not covered" >      if (!data) {</span>
+      const data = await iciteService.getByPmids(pmid);
+      <span class="missing-if-branch" title="if path not taken" >I</span>if (!data) {
 <span class="cstat-no" title="statement not covered" >        return res.status(404).json({ success: false, message: 'No se encontró información para el PMID proporcionado' });</span>
       }
-<span class="cstat-no" title="statement not covered" >      return res.status(200).json({ success: true, data });</span>
+      return res.status(200).json({ success: true, data });
     } catch (error) {
 <span class="cstat-no" title="statement not covered" >      console.error('Error en getByPmid:', error);</span>
 <span class="cstat-no" title="statement not covered" >      return res.status(500).json({ success: false, message: error.message || 'Error interno del servidor' });</span>
@@ -183,14 +183,14 @@ const iciteController = {
    * @param {Object} req - Express request
    * @param {Object} res - Express response
    */
-  getBatch: <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {
-<span class="cstat-no" title="statement not covered" >    try {</span>
-      const { pmids } = <span class="cstat-no" title="statement not covered" >req.body;</span>
-<span class="cstat-no" title="statement not covered" >      if (!pmids || !Array.isArray(pmids) || pmids.length === 0) {</span>
-<span class="cstat-no" title="statement not covered" >        return res.status(400).json({ success: false, message: 'Se requiere un array de PMIDs' });</span>
+  getBatch: async (req, res) =&gt; {
+    try {
+      const { pmids } = req.body;
+      if (!pmids || !Array.isArray(pmids) || pmids.length === 0) {
+        return res.status(400).json({ success: false, message: 'Se requiere un array de PMIDs' });
       }
-      const data = <span class="cstat-no" title="statement not covered" >await iciteService.getByPmids(pmids);</span>
-<span class="cstat-no" title="statement not covered" >      return res.status(200).json({ success: true, data });</span>
+      const data = await iciteService.getByPmids(pmids);
+      return res.status(200).json({ success: true, data });
     } catch (error) {
 <span class="cstat-no" title="statement not covered" >      console.error('Error en getBatch:', error);</span>
 <span class="cstat-no" title="statement not covered" >      return res.status(500).json({ success: false, message: error.message || 'Error interno del servidor' });</span>
@@ -205,7 +205,7 @@ export default iciteController; </pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-04-28T20:22:49.363Z
+                at 2025-04-29T01:22:16.697Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

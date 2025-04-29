@@ -1,9 +1,11 @@
 /**
  * Servicio para interactuar con la API de PubMed
+ * Este módulo maneja la búsqueda y recuperación de artículos científicos de PubMed
  */
 import axios from 'axios';
 import config from '../config/index.js';
 import Article from '../models/Article.js';
+import { JSDOM } from 'jsdom';
 
 class PubMedService {
   constructor() {
@@ -24,7 +26,38 @@ class PubMedService {
       console.log(`Consulta: "${query}"`);
       console.log(`Máximo de resultados: ${maxResults}`);
       
-      // PASO 1: Realizar búsqueda inicial
+      // Configuración de retry para todas las llamadas API
+      const maxRetries = 3;
+      
+      // Función de reintento con espera exponencial
+      const apiCallWithRetry = async (url, params, apiName, retryCount = 0) => {
+        try {
+          console.log(`Llamando a ${apiName}... (intento ${retryCount + 1})`);
+          const response = await axios.get(url, { 
+            params,
+            timeout: 30000 // 30 segundos timeout
+          });
+          return response;
+        } catch (error) {
+          // Si es error de rate limit (429) o timeout o error de servidor (5xx)
+          if ((error.response && (error.response.status === 429 || error.response.status >= 500)) || 
+              error.code === 'ECONNABORTED' || 
+              error.code === 'ETIMEDOUT') {
+            
+            if (retryCount < maxRetries) {
+              // Espera exponencial: 2^retryCount * 2 segundos (2, 4, 8 segundos)
+              const delay = Math.pow(2, retryCount) * 2000 + Math.random() * 1000;
+              console.log(`Error de ${apiName} (${error.message}). Reintentando en ${delay/1000} segundos...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              return apiCallWithRetry(url, params, apiName, retryCount + 1);
+            }
+          }
+          
+          throw error;
+        }
+      };
+      
+      // PASO 1: Realizar búsqueda inicial con retry
       console.log('PASO 1: Búsqueda inicial (esearch.fcgi)');
       const searchUrl = `${this.baseUrl}/esearch.fcgi`;
       const searchParams = {
@@ -39,7 +72,7 @@ class PubMedService {
       const startTimeSearch = Date.now();
       let searchResponse;
       try {
-        searchResponse = await axios.get(searchUrl, { params: searchParams });
+        searchResponse = await apiCallWithRetry(searchUrl, searchParams, 'esearch.fcgi');
         const endTimeSearch = Date.now();
         console.log(`Tiempo de respuesta esearch: ${endTimeSearch - startTimeSearch}ms`);
       } catch (searchError) {
@@ -67,6 +100,10 @@ class PubMedService {
       
       // PASO 2: Obtener resumen de artículos
       console.log('PASO 2: Obtención de resúmenes (esummary.fcgi)');
+      
+      // Esperar antes de la siguiente solicitud API
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       const summaryUrl = `${this.baseUrl}/esummary.fcgi`;
       const summaryParams = {
         db: 'pubmed',
@@ -78,7 +115,7 @@ class PubMedService {
       const startTimeSummary = Date.now();
       let summaryResponse;
       try {
-        summaryResponse = await axios.get(summaryUrl, { params: summaryParams });
+        summaryResponse = await apiCallWithRetry(summaryUrl, summaryParams, 'esummary.fcgi');
         const endTimeSummary = Date.now();
         console.log(`Tiempo de respuesta esummary: ${endTimeSummary - startTimeSummary}ms`);
       } catch (summaryError) {
@@ -102,80 +139,119 @@ class PubMedService {
       // PASO 3: Obtener abstract y términos MeSH para cada artículo
       console.log('PASO 3: Obtención de abstracts y términos MeSH (efetch.fcgi)');
       
-      // Procesar cada artículo
-      const articlesWithAbstracts = await Promise.all(
-        idList.map(async (pmid, index) => {
-          try {
-            console.log(`[${index + 1}/${idList.length}] Procesando artículo PMID: ${pmid}`);
-            const articleData = result[pmid];
-            if (!articleData) {
-              console.error(`No se encontraron datos para PMID ${pmid}`);
-              return null;
-            }
-            
-            // Obtener abstract y términos MeSH
-            const efetchUrl = `${this.baseUrl}/efetch.fcgi`;
-            const efetchParams = {
-              db: 'pubmed',
-              id: pmid,
-              retmode: 'xml',
-              api_key: this.apiKey
-            };
-
-            const startTimeEfetch = Date.now();
-            let efetchResponse;
+      // Procesar artículos en lotes más pequeños para evitar rate limiting
+      const batchSize = 5; 
+      const batches = [];
+      
+      for (let i = 0; i < idList.length; i += batchSize) {
+        batches.push(idList.slice(i, i + batchSize));
+      }
+      
+      const articlesWithAbstracts = [];
+      
+      for (let i = 0; i < batches.length; i++) {
+        const batchPmids = batches[i];
+        console.log(`Procesando lote ${i + 1}/${batches.length} (${batchPmids.length} artículos)`);
+        
+        // Añadir un retraso entre lotes
+        if (i > 0) {
+          const delay = 3000;
+          console.log(`Esperando ${delay/1000} segundos antes del siguiente lote...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        
+        // Procesar todos los artículos del lote actual
+        const batchResults = await Promise.all(
+          batchPmids.map(async (pmid, index) => {
             try {
-              efetchResponse = await axios.get(efetchUrl, { params: efetchParams });
-              const endTimeEfetch = Date.now();
-              console.log(`Tiempo de respuesta efetch para PMID ${pmid}: ${endTimeEfetch - startTimeEfetch}ms`);
-            } catch (efetchError) {
-              console.error(`ERROR en llamada a efetch.fcgi para PMID ${pmid}:`);
-              console.error(`- Mensaje: ${efetchError.message}`);
-              if (efetchError.response) {
-                console.error(`- Estado HTTP: ${efetchError.response.status}`);
+              // Retraso escalonado dentro del lote
+              if (index > 0) {
+                await new Promise(resolve => setTimeout(resolve, 500)); // 500ms entre artículos del mismo lote
               }
+              
+              console.log(`[${i * batchSize + index + 1}/${idList.length}] Procesando artículo PMID: ${pmid}`);
+              const articleData = result[pmid];
+              if (!articleData) {
+                console.error(`No se encontraron datos para PMID ${pmid}`);
+                return null;
+              }
+              
+              // Obtener abstract y términos MeSH
+              const efetchUrl = `${this.baseUrl}/efetch.fcgi`;
+              const efetchParams = {
+                db: 'pubmed',
+                id: pmid,
+                retmode: 'xml',
+                api_key: this.apiKey
+              };
+
+              const startTimeEfetch = Date.now();
+              let efetchResponse;
+              try {
+                efetchResponse = await apiCallWithRetry(efetchUrl, efetchParams, `efetch.fcgi (PMID: ${pmid})`);
+                const endTimeEfetch = Date.now();
+                console.log(`Tiempo de respuesta efetch para PMID ${pmid}: ${endTimeEfetch - startTimeEfetch}ms`);
+              } catch (efetchError) {
+                console.error(`ERROR en llamada a efetch.fcgi para PMID ${pmid}:`);
+                console.error(`- Mensaje: ${efetchError.message}`);
+                if (efetchError.response) {
+                  console.error(`- Estado HTTP: ${efetchError.response.status}`);
+                }
+                return null;
+              }
+              
+              // Utilizar JSDOM para parsear el XML
+              const dom = new JSDOM(efetchResponse.data, { contentType: "text/xml" });
+              const xmlDoc = dom.window.document;
+              
+              // Extraer abstract
+              let abstractText = 'Abstract no disponible';
+              const abstractElements = xmlDoc.getElementsByTagName("AbstractText");
+              if (abstractElements && abstractElements.length > 0) {
+                // Combinar todos los elementos del abstract
+                abstractText = Array.from(abstractElements)
+                  .map(element => element.textContent)
+                  .join(' ');
+              }
+              console.log(`PMID ${pmid} - Abstract: ${abstractText.substring(0, 50)}...`);
+              
+              // Extraer términos MeSH
+              const meshTerms = [];
+              const descriptorElements = xmlDoc.getElementsByTagName("DescriptorName");
+              if (descriptorElements && descriptorElements.length > 0) {
+                for (const element of descriptorElements) {
+                  meshTerms.push(element.textContent);
+                }
+              }
+              console.log(`PMID ${pmid} - Términos MeSH encontrados: ${meshTerms.length}`);
+              
+              // Crear objeto de artículo
+              const rawArticleData = {
+                pmid: pmid,
+                doi: articleData.articleids?.find(id => id.idtype === 'doi')?.value || null,
+                title: this._sanitizeTitle(articleData.title),
+                authors: this._processAuthors(articleData.authors),
+                pubdate: articleData.pubdate || 'Fecha desconocida',
+                abstract: this._sanitizeText(abstractText),
+                meshTerms: meshTerms,
+                source: articleData.source || null
+              };
+              
+              // Usar el modelo Article para estandarizar el formato
+              const article = new Article(rawArticleData);
+              
+              console.log(`PMID ${pmid} - Artículo procesado exitosamente: "${article.title.substring(0, 50)}..."`);
+              return article;
+            } catch (error) {
+              console.error(`Error obteniendo detalles para PMID ${pmid}:`, error);
               return null;
             }
-            
-            // Extraer abstract
-            const abstractMatch = efetchResponse.data.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/);
-            const abstractText = abstractMatch ? abstractMatch[1] : 'Abstract no disponible';
-            console.log(`PMID ${pmid} - Abstract: ${abstractText.substring(0, 50)}...`);
-            
-            // Extraer términos MeSH
-            const meshTermsMatch = efetchResponse.data.match(/<DescriptorName[^>]*>(.*?)<\/DescriptorName>/g);
-            const meshTerms = meshTermsMatch
-              ? meshTermsMatch.map(term => {
-                  const match = term.match(/<DescriptorName[^>]*>(.*?)<\/DescriptorName>/);
-                  return match ? match[1] : null;
-                }).filter(Boolean)
-              : [];
-            
-            console.log(`PMID ${pmid} - Términos MeSH encontrados: ${meshTerms.length}`);
-            
-            // Crear objeto de artículo
-            const rawArticleData = {
-              pmid: pmid,
-              doi: articleData.articleids?.find(id => id.idtype === 'doi')?.value || null,
-              title: this._sanitizeTitle(articleData.title),
-              authors: this._processAuthors(articleData.authors),
-              pubdate: articleData.pubdate || 'Fecha desconocida',
-              abstract: this._sanitizeText(abstractText),
-              meshTerms: meshTerms,
-              source: articleData.source || null
-            };
-            
-            // Usar el modelo Article para estandarizar el formato
-            const article = new Article(rawArticleData);
-            
-            console.log(`PMID ${pmid} - Artículo procesado exitosamente: "${article.title.substring(0, 50)}..."`);
-            return article;
-          } catch (error) {
-            console.error(`Error obteniendo detalles para PMID ${pmid}:`, error);
-            return null;
-          }
-        })
-      );
+          })
+        );
+
+        // Añadir los resultados del lote actual al array final
+        articlesWithAbstracts.push(...batchResults);
+      }
 
       // Filtrar resultados nulos
       const filteredResults = articlesWithAbstracts.filter(Boolean);
@@ -230,18 +306,28 @@ class PubMedService {
       
       const efetchResponse = await axios.get(efetchUrl, { params: efetchParams });
       
+      // Utilizar JSDOM para parsear el XML
+      const dom = new JSDOM(efetchResponse.data, { contentType: "text/xml" });
+      const xmlDoc = dom.window.document;
+      
       // Extraer abstract
-      const abstractMatch = efetchResponse.data.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/);
-      const abstractText = abstractMatch ? abstractMatch[1] : 'Abstract no disponible';
+      let abstractText = 'Abstract no disponible';
+      const abstractElements = xmlDoc.getElementsByTagName("AbstractText");
+      if (abstractElements && abstractElements.length > 0) {
+        // Combinar todos los elementos del abstract
+        abstractText = Array.from(abstractElements)
+          .map(element => element.textContent)
+          .join(' ');
+      }
       
       // Extraer términos MeSH
-      const meshTermsMatch = efetchResponse.data.match(/<DescriptorName[^>]*>(.*?)<\/DescriptorName>/g);
-      const meshTerms = meshTermsMatch
-        ? meshTermsMatch.map(term => {
-            const match = term.match(/<DescriptorName[^>]*>(.*?)<\/DescriptorName>/);
-            return match ? match[1] : null;
-          }).filter(Boolean)
-        : [];
+      const meshTerms = [];
+      const descriptorElements = xmlDoc.getElementsByTagName("DescriptorName");
+      if (descriptorElements && descriptorElements.length > 0) {
+        for (const element of descriptorElements) {
+          meshTerms.push(element.textContent);
+        }
+      }
       
       // Crear objeto de artículo
       const rawArticleData = {
@@ -435,8 +521,8 @@ class PubMedService {
       
       // Parsear XML y extraer datos básicos
       const articles = [];
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(fetchResponse.data, "text/xml");
+      const dom = new JSDOM(fetchResponse.data, { contentType: "text/xml" });
+      const xmlDoc = dom.window.document;
       const articleNodes = xmlDoc.getElementsByTagName("PubmedArticle");
       
       for (let articleNode of articleNodes) {
@@ -480,9 +566,10 @@ class PubMedService {
       
       console.log(`Recuperando abstracts para ${articles.length} artículos`);
       
-      // Procesar en lotes para respetar el rate limit
-      const batchSize = 10;
-      const delayBetweenBatches = 1000; // 1 segundo entre lotes
+      // Procesar en lotes más pequeños para evitar rate limiting
+      const batchSize = 5; // Reducido de 10 a 5
+      const delayBetweenBatches = 3000; // Aumentado de 1 a 3 segundos entre lotes
+      const maxRetries = 3; // Número máximo de reintentos
       const batches = [];
       
       for (let i = 0; i < articles.length; i += batchSize) {
@@ -495,13 +582,44 @@ class PubMedService {
         const batch = batches[i];
         const pmids = batch.map(article => article.pmid).join(',');
         
+        // Función de reintento con espera exponencial
+        const fetchWithRetry = async (retryCount = 0) => {
+          try {
+            const fetchUrl = `${this.baseUrl}/efetch.fcgi?db=pubmed&id=${pmids}&retmode=xml`;
+            console.log(`Solicitando abstracts para el lote ${i+1}/${batches.length} (intento ${retryCount+1})`);
+            
+            const response = await axios.get(fetchUrl, {
+              headers: this.apiKey ? { 'api-key': this.apiKey } : {},
+              timeout: 20000 // 20 segundos de timeout
+            });
+            
+            return response;
+          } catch (error) {
+            // Si es error de rate limit (429) o timeout o error de servidor (5xx)
+            if ((error.response && (error.response.status === 429 || error.response.status >= 500)) || 
+                error.code === 'ECONNABORTED' || 
+                error.code === 'ETIMEDOUT') {
+              
+              if (retryCount < maxRetries) {
+                // Espera exponencial: 2^retryCount * 2 segundos (2, 4, 8 segundos)
+                const delay = Math.pow(2, retryCount) * 2000 + Math.random() * 1000;
+                console.log(`Error de rate limit o timeout. Reintentando en ${delay/1000} segundos...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return fetchWithRetry(retryCount + 1);
+              }
+            }
+            
+            throw error; // Re-lanzar otros tipos de errores o si se agotaron los reintentos
+          }
+        };
+        
         try {
-          const fetchUrl = `${this.baseUrl}/efetch.fcgi?db=pubmed&id=${pmids}&retmode=xml`;
-          const response = await axios.get(fetchUrl);
+          // Intentar obtener los datos con reintento automático
+          const response = await fetchWithRetry();
           
           // Parsear XML y extraer abstracts
-          const parser = new DOMParser();
-          const xmlDoc = parser.parseFromString(response.data, "text/xml");
+          const dom = new JSDOM(response.data, { contentType: "text/xml" });
+          const xmlDoc = dom.window.document;
           const articleNodes = xmlDoc.getElementsByTagName("PubmedArticle");
           
           for (let articleNode of articleNodes) {
@@ -518,13 +636,14 @@ class PubMedService {
               articlesWithAbstracts.push({
                 ...originalArticle,
                 abstract: abstractText,
-                hasAbstract: true
+                hasAbstract: !!abstractText
               });
             }
           }
           
           // Esperar antes del siguiente lote para respetar rate limit
           if (i < batches.length - 1) {
+            console.log(`Esperando ${delayBetweenBatches/1000} segundos antes del próximo lote...`);
             await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
           }
         } catch (batchError) {
@@ -535,6 +654,12 @@ class PubMedService {
             abstract: null,
             hasAbstract: false
           })));
+          
+          // Esperar más tiempo después de un error antes de continuar
+          if (i < batches.length - 1) {
+            console.log('Esperando 5 segundos adicionales después del error...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
         }
       }
       

@@ -32,26 +32,54 @@ export const claudeServiceMock = {
     strategy: '("Test"[Mesh] AND "Strategy"[tiab])',
     fullResponse: 'Estrategia completa generada por Claude'
   }),
-  analyzeArticle: jest.fn().mockResolvedValue('Análisis detallado del artículo'),
+  analyzeArticle: jest.fn()
+    .mockImplementation(async (article, question) => {
+      // Implementación por defecto
+      return 'Análisis detallado del artículo';
+    }),
   generateResponse: jest.fn().mockResolvedValue('Respuesta generada por Claude'),
   filterByTitles: jest.fn().mockImplementation(articles => {
     // Devolver los dos primeros artículos como filtrados
     return articles.slice(0, 2);
   }),
   filterTitlesByRelevance: jest.fn().mockImplementation(articles => articles),
-  analyzeArticleBatch: jest.fn().mockResolvedValue([
-    {
-      pmid: '12345',
-      title: 'Artículo 1',
-      secondaryAnalysis: 'Análisis del artículo 1'
-    },
-    {
-      pmid: '67890',
-      title: 'Artículo 2',
-      secondaryAnalysis: 'Análisis del artículo 2'
+  analyzeArticleBatch: jest.fn()
+    .mockImplementation(async (articles, question) => {
+      // Por defecto, retorna artículos analizados
+      return articles.map((article, index) => ({
+        ...article,
+        secondaryAnalysis: `Análisis del artículo ${index + 1}`,
+        analyzed: true
+      }));
+    }),
+  generateSynthesis: jest.fn().mockResolvedValue('Síntesis de la evidencia científica'),
+  // Métodos específicos para probar el manejo de rate limit
+  handleRateLimit: jest.fn().mockImplementation(async (error, retryFn) => {
+    // Simula el manejo de rate limit con reintento
+    if (error.message && error.message.includes('rate limit')) {
+      // Simular espera y reintentar
+      return await retryFn();
     }
-  ]),
-  generateSynthesis: jest.fn().mockResolvedValue('Síntesis de la evidencia científica')
+    throw error;
+  }),
+  retryWithExponentialBackoff: jest.fn().mockImplementation(async (fn, maxRetries = 3) => {
+    // Simula el algoritmo de backoff exponencial
+    let lastError;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error;
+        // Si no es el último intento y es un error de rate limit, continuar
+        if (attempt < maxRetries - 1 && error.message && 
+            (error.message.includes('rate limit') || error.message.includes('429'))) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw lastError;
+  })
 };
 
 export const iciteServiceMock = {

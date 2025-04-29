@@ -81,7 +81,21 @@ class AIService {
         contentLength: data.content ? data.content.length : 0 
       });
       
-      return data.content;
+      // Ahora manejamos la posibilidad de que content sea un objeto con strategy y fullResponse
+      let result = data.content;
+      
+      // Si es un objeto con structure {strategy, fullResponse}
+      if (result && typeof result === 'object' && (result.strategy || result.fullResponse)) {
+        logInfo(methodName, 'Respuesta recibida en nuevo formato (objeto)', {
+          hasStrategy: !!result.strategy,
+          hasFullResponse: !!result.fullResponse
+        });
+        // Devolvemos el objeto completo para que el frontend pueda usar ambas partes
+        return result;
+      }
+      
+      // Compatibilidad con el formato anterior (string)
+      return result;
     } catch (error) {
       logError(methodName, 'Error al generar estrategia de búsqueda', error);
       throw error;
@@ -97,53 +111,109 @@ class AIService {
   async analyzeArticle(article, clinicalQuestion) {
     const methodName = 'analyzeArticle';
     try {
-      logInfo(methodName, `Analizando artículo PMID: ${article.pmid || 'sin PMID'}`);
+      logInfo(methodName, `Analizando artículo: ${article.pmid || 'sin PMID'}`);
       
       if (!article || !clinicalQuestion) {
-        throw new Error('Se requiere un artículo y una pregunta clínica');
+        throw new Error('Se requieren artículo y pregunta clínica');
       }
 
-      const prompt = generateAnalysisPrompt(article, clinicalQuestion);
-      logInfo(methodName, `Prompt generado, longitud: ${prompt.length} caracteres`);
-      
-      const endpoint = `${this.apiUrl}/analyze`;
-      logInfo(methodName, `Enviando solicitud a ${endpoint}`);
+      // Validar y normalizar la propiedad authors
+      const processedArticle = {...article};
+      if (!processedArticle.authors) {
+        processedArticle.authors = [];
+      } else if (!Array.isArray(processedArticle.authors)) {
+        // Si authors existe pero no es un array, convertirlo a array
+        if (typeof processedArticle.authors === 'string') {
+          // Si es una cadena, crear un array con un solo elemento
+          processedArticle.authors = [{ name: processedArticle.authors }];
+        } else {
+          // Si es otro tipo, crear un array vacío
+          processedArticle.authors = [];
+        }
+      }
       
       const startTime = Date.now();
-      const response = await fetch(endpoint, {
+      logInfo(methodName, 'Enviando solicitud al servidor');
+      
+      const response = await fetch(`${this.apiUrl}/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ 
+          article: processedArticle, 
+          clinicalQuestion 
+        }),
       });
-      const endTime = Date.now();
       
+      const endTime = Date.now();
       logInfo(methodName, `Respuesta recibida en ${endTime - startTime}ms, status: ${response.status}`);
       
       if (!response.ok) {
-        let errorMessage = 'Error desconocido';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || response.statusText;
-        } catch (e) {
-          errorMessage = response.statusText;
+        const errorText = await response.text();
+        throw new Error(`Error en la solicitud: ${response.status} - ${errorText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Mejorado: Verificación más detallada de la respuesta para manejar diferentes estructuras de datos
+      if (!data.success) {
+        throw new Error(`El servidor indicó un error: ${data.message || 'Error desconocido'}`);
+      }
+      
+      // Verificar si la respuesta tiene la estructura esperada
+      if (data.analysis) {
+        logInfo(methodName, 'Análisis completado con éxito (formato estándar)');
+        return data.analysis;
+      } else if (data.content) {
+        // Formato alternativo que puede estar usando el backend
+        logInfo(methodName, 'Análisis completado con éxito (formato alternativo)');
+        return data.content;
+      } else {
+        // Si no encontramos el análisis en ningún formato conocido
+        logInfo(methodName, 'Respuesta recibida pero sin contenido de análisis', data);
+        
+        // Verificar si hay algún otro campo que podría contener el análisis
+        const possibleFields = ['result', 'secondaryAnalysis', 'text', 'html'];
+        for (const field of possibleFields) {
+          if (data[field] && typeof data[field] === 'string' && data[field].length > 0) {
+            logInfo(methodName, `Usando campo alternativo "${field}" para el análisis`);
+            return data[field];
+          }
         }
         
-        logError(methodName, `Error en respuesta: ${errorMessage}`, { status: response.status });
-        throw new Error(`Error en API de Claude: ${errorMessage}`);
+        // Si no podemos encontrar el análisis, crear una respuesta de error formateada
+        return `<div class="card-analysis">
+          <div class="card-header">
+            <h3>ANÁLISIS DE EVIDENCIA</h3>
+            <div class="badges">
+              <span class="badge quality">★☆☆☆☆</span>
+              <span class="badge type">Error</span>
+            </div>
+          </div>
+          <div class="card-section">
+            <h4>ERROR DE ANÁLISIS</h4>
+            <p>No fue posible analizar este artículo. Error: Formato de respuesta inválido</p>
+          </div>
+        </div>`;
       }
-
-      const data = await response.json();
-      logInfo(methodName, 'Datos de análisis recibidos', { 
-        success: data.success, 
-        contentLength: data.content ? data.content.length : 0 
-      });
-      
-      return data.content;
     } catch (error) {
-      logError(methodName, `Error al analizar artículo ${article.pmid || 'sin PMID'}`, error);
-      throw error;
+      logError(methodName, 'Error en análisis de artículo', error);
+      
+      // Devolver un mensaje de error formateado como HTML para que se muestre correctamente
+      return `<div class="card-analysis">
+        <div class="card-header">
+          <h3>ANÁLISIS DE EVIDENCIA</h3>
+          <div class="badges">
+            <span class="badge quality">★☆☆☆☆</span>
+            <span class="badge type">Error</span>
+          </div>
+        </div>
+        <div class="card-section">
+          <h4>ERROR DE ANÁLISIS</h4>
+          <p>No fue posible analizar este artículo. Error: ${error.message || 'Desconocido'}</p>
+        </div>
+      </div>`;
     }
   }
 
@@ -161,6 +231,27 @@ class AIService {
       if (!articles || !articles.length || !clinicalQuestion) {
         throw new Error('Se requieren artículos y una pregunta clínica');
       }
+
+      // Validar y normalizar la propiedad authors para cada artículo
+      const validatedArticles = articles.map(article => {
+        const processedArticle = {...article};
+        
+        // Verificar y corregir la propiedad authors si es necesario
+        if (!processedArticle.authors) {
+          processedArticle.authors = [];
+        } else if (!Array.isArray(processedArticle.authors)) {
+          // Si authors existe pero no es un array, convertirlo a array
+          if (typeof processedArticle.authors === 'string') {
+            // Si es una cadena, crear un array con un solo elemento
+            processedArticle.authors = [{ name: processedArticle.authors }];
+          } else {
+            // Si es otro tipo, crear un array vacío
+            processedArticle.authors = [];
+          }
+        }
+        
+        return processedArticle;
+      });
 
       // Comprobar API endpoint para lotes
       let useBatchEndpoint = false;
@@ -192,7 +283,7 @@ class AIService {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ 
-            articles, 
+            articles: validatedArticles, 
             clinicalQuestion 
           }),
         });
@@ -220,19 +311,52 @@ class AIService {
       // Procesar artículos en paralelo con Promise.all
       const totalStartTime = Date.now();
       const analyzedArticles = await Promise.all(
-        articles.map(async (article, index) => {
+        validatedArticles.map(async (article, index) => {
           try {
-            logInfo(methodName, `Procesando artículo ${index+1}/${articles.length}: ${article.pmid || 'sin PMID'}`);
+            logInfo(methodName, `Procesando artículo ${index+1}/${validatedArticles.length}: ${article.pmid || 'sin PMID'}`);
+            
+            // Intento de análisis usando el método mejorado que maneja errores internamente
             const analysis = await this.analyzeArticle(article, clinicalQuestion);
+            
+            // Verificar si el análisis contiene indicación de error
+            const isErrorAnalysis = typeof analysis === 'string' && 
+                                   (analysis.includes('<span class="badge type">Error</span>') || 
+                                    analysis.includes('ERROR DE ANÁLISIS'));
+            
+            if (isErrorAnalysis) {
+              logError(methodName, `Error detectado en análisis de artículo ${index+1}/${validatedArticles.length}: ${article.pmid || 'sin PMID'}`);
+              return {
+                ...article,
+                secondaryAnalysis: analysis,
+                analysisError: true  // Marcar como error para la UI
+              };
+            }
+            
             return {
               ...article,
               secondaryAnalysis: analysis
             };
           } catch (error) {
-            logError(methodName, `Error en artículo ${index+1}/${articles.length}: ${article.pmid || 'sin PMID'}`, error);
+            logError(methodName, `Error en artículo ${index+1}/${validatedArticles.length}: ${article.pmid || 'sin PMID'}`, error);
+            
+            // Crear un mensaje de error formateado como HTML
+            const errorAnalysis = `<div class="card-analysis">
+              <div class="card-header">
+                <h3>ANÁLISIS DE EVIDENCIA</h3>
+                <div class="badges">
+                  <span class="badge quality">★☆☆☆☆</span>
+                  <span class="badge type">Error</span>
+                </div>
+              </div>
+              <div class="card-section">
+                <h4>ERROR DE ANÁLISIS</h4>
+                <p>No fue posible analizar este artículo. Error: ${error.message || 'Desconocido'}</p>
+              </div>
+            </div>`;
+            
             return {
               ...article,
-              secondaryAnalysis: "No fue posible generar un análisis secundario para este artículo.",
+              secondaryAnalysis: errorAnalysis,
               analysisError: true
             };
           }

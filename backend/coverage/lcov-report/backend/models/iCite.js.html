@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">92.85% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/28</span>
+                <span class='fraction'>26/28</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">61.53% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/52</span>
+                <span class='fraction'>32/52</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>1/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">96.29% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/27</span>
+                <span class='fraction'>26/27</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -122,32 +122,32 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -173,33 +173,33 @@ class ICite {
    * Crea una nueva instancia de ICite a partir de datos de la API de iCite
    * @param {Object} data - Datos de la API de iCite
    */
-<span class="fstat-no" title="function not covered" >  co</span>nstructor(data) {
-<span class="cstat-no" title="statement not covered" >    if (!data) <span class="cstat-no" title="statement not covered" >data = {};</span></span>
-<span class="cstat-no" title="statement not covered" >    this.pmid = data.pmid || null;</span>
-<span class="cstat-no" title="statement not covered" >    this.year = data.year || null;</span>
-<span class="cstat-no" title="statement not covered" >    this.title = data.title || '';</span>
-<span class="cstat-no" title="statement not covered" >    this.authors = data.authors || '';</span>
-<span class="cstat-no" title="statement not covered" >    this.journal = data.journal || '';</span>
-<span class="cstat-no" title="statement not covered" >    this.is_research_article = data.is_research_article || '';</span>
-<span class="cstat-no" title="statement not covered" >    this.relative_citation_ratio = data.relative_citation_ratio || null;</span>
-<span class="cstat-no" title="statement not covered" >    this.nih_percentile = data.nih_percentile || null;</span>
-<span class="cstat-no" title="statement not covered" >    this.human = data.human || null;</span>
-<span class="cstat-no" title="statement not covered" >    this.animal = data.animal || null;</span>
-<span class="cstat-no" title="statement not covered" >    this.molecular_cellular = data.molecular_cellular || null;</span>
-<span class="cstat-no" title="statement not covered" >    this.apt = data.apt || null;</span>
-<span class="cstat-no" title="statement not covered" >    this.is_clinical = data.is_clinical || '';</span>
-<span class="cstat-no" title="statement not covered" >    this.citation_count = data.citation_count || null;</span>
-<span class="cstat-no" title="statement not covered" >    this.citations_per_year = data.citations_per_year || null;</span>
-<span class="cstat-no" title="statement not covered" >    this.expected_citations_per_year = data.expected_citations_per_year || null;</span>
-<span class="cstat-no" title="statement not covered" >    this.field_citation_rate = data.field_citation_rate || null;</span>
-<span class="cstat-no" title="statement not covered" >    this.provisional = data.provisional || '';</span>
-<span class="cstat-no" title="statement not covered" >    this.x_coord = data.x_coord || null;</span>
-<span class="cstat-no" title="statement not covered" >    this.y_coord = data.y_coord || null;</span>
-<span class="cstat-no" title="statement not covered" >    this.cited_by_clin = Array.isArray(data.cited_by_clin) ? data.cited_by_clin : [];</span>
-<span class="cstat-no" title="statement not covered" >    this.cited_by = Array.isArray(data.cited_by) ? data.cited_by : [];</span>
-<span class="cstat-no" title="statement not covered" >    this.references = Array.isArray(data.references) ? data.references : [];</span>
-<span class="cstat-no" title="statement not covered" >    this.doi = data.doi || '';</span>
-<span class="cstat-no" title="statement not covered" >    this.last_modified = data.last_modified || '';</span>
+  constructor(data) {
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (!data) <span class="cstat-no" title="statement not covered" >data = {};</span>
+    this.pmid = data.pmid || <span class="branch-1 cbranch-no" title="branch not covered" >null;</span>
+    this.year = data.year || <span class="branch-1 cbranch-no" title="branch not covered" >null;</span>
+    this.title = data.title || <span class="branch-1 cbranch-no" title="branch not covered" >'';</span>
+    this.authors = data.authors || <span class="branch-1 cbranch-no" title="branch not covered" >'';</span>
+    this.journal = data.journal || <span class="branch-1 cbranch-no" title="branch not covered" >'';</span>
+    this.is_research_article = data.is_research_article || <span class="branch-1 cbranch-no" title="branch not covered" >'';</span>
+    this.relative_citation_ratio = data.relative_citation_ratio || <span class="branch-1 cbranch-no" title="branch not covered" >null;</span>
+    this.nih_percentile = data.nih_percentile || null;
+    this.human = data.human || null;
+    this.animal = data.animal || null;
+    this.molecular_cellular = data.molecular_cellular || null;
+    this.apt = data.apt || <span class="branch-1 cbranch-no" title="branch not covered" >null;</span>
+    this.is_clinical = data.is_clinical || <span class="branch-1 cbranch-no" title="branch not covered" >'';</span>
+    this.citation_count = data.citation_count || <span class="branch-1 cbranch-no" title="branch not covered" >null;</span>
+    this.citations_per_year = data.citations_per_year || <span class="branch-1 cbranch-no" title="branch not covered" >null;</span>
+    this.expected_citations_per_year = data.expected_citations_per_year || <span class="branch-1 cbranch-no" title="branch not covered" >null;</span>
+    this.field_citation_rate = data.field_citation_rate || <span class="branch-1 cbranch-no" title="branch not covered" >null;</span>
+    this.provisional = data.provisional || <span class="branch-1 cbranch-no" title="branch not covered" >'';</span>
+    this.x_coord = data.x_coord || null;
+    this.y_coord = data.y_coord || <span class="branch-1 cbranch-no" title="branch not covered" >null;</span>
+    this.cited_by_clin = Array.isArray(data.cited_by_clin) ? <span class="branch-0 cbranch-no" title="branch not covered" >data.cited_by_clin </span>: [];
+    this.cited_by = Array.isArray(data.cited_by) ? data.cited_by : <span class="branch-1 cbranch-no" title="branch not covered" >[];</span>
+    this.references = Array.isArray(data.references) ? data.references : <span class="branch-1 cbranch-no" title="branch not covered" >[];</span>
+    this.doi = data.doi || '';
+    this.last_modified = data.last_modified || <span class="branch-1 cbranch-no" title="branch not covered" >'';</span>
   }
 &nbsp;
   /**
@@ -226,7 +226,7 @@ export default ICite; </pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-04-28T20:22:49.363Z
+                at 2025-04-29T01:22:16.697Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

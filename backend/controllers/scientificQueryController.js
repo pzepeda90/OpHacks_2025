@@ -301,7 +301,7 @@ const scientificQueryController = {
    * @param {Object} req - Objeto de solicitud Express
    * @param {Object} res - Objeto de respuesta Express
    */
-  async processQuery(req, res) {
+  processQuery: async (req, res) => {
     const { question, strategy, useAI = true } = req.body;
     const startTime = Date.now();
     let processAlert = null;
@@ -331,7 +331,7 @@ const scientificQueryController = {
         fullResponseStrategy = strategy;
         
         // Validar la estrategia proporcionada
-        searchStrategy = this._validateSearchStrategy(strategy);
+        searchStrategy = scientificQueryController._validateSearchStrategy(strategy);
       } else if (useAI) {
         try {
           // Generar estrategia usando Claude
@@ -352,7 +352,7 @@ const scientificQueryController = {
           }
           
           // Validar y optimizar la estrategia generada
-          searchStrategy = this._validateSearchStrategy(searchStrategy);
+          searchStrategy = scientificQueryController._validateSearchStrategy(searchStrategy);
         } catch (strategyError) {
           logProgress('ERROR', `Error al generar estrategia: ${strategyError.message}`);
           // Usar la pregunta directamente como fallback
@@ -476,7 +476,7 @@ const scientificQueryController = {
       
       // Priorizar artículos
       logProgress('ETAPA 3', `Calculando relevancia para ${enrichedArticles.length} artículos`);
-      const prioritizedArticles = this._prioritizeArticles(enrichedArticles, question);
+      const prioritizedArticles = scientificQueryController._prioritizeArticles(enrichedArticles, question);
       
       // Analizar solo los artículos más relevantes
       const topArticlesToAnalyze = 5;
