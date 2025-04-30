@@ -1,0 +1,1 @@
+logInfo(method, `De ${articles.length} artículos, ${validArticles.length} son válidos para análisis`);

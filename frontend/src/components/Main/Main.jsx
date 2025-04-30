@@ -1060,11 +1060,10 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
             {searchStrategy && (
               <div className="search-strategy">
                 <h4>Estrategia de búsqueda generada:</h4>
-                <div className="strategy-content">
-                  {searchStrategy.split('\n').map((line, index) => (
-                    <p key={index}>{line}</p>
-                  ))}
-                </div>
+                <div 
+                  className="strategy-content" 
+                  dangerouslySetInnerHTML={{ __html: searchStrategy }}
+                />
               </div>
             )}
             

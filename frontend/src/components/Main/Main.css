@@ -586,7 +586,7 @@
   }
 }
 
-/* Estrategia de búsqueda */
+/* Estrategia de búsqueda mejorada */
 .search-strategy {
   background-color: var(--card-bg);
   padding: 1.5rem;
@@ -605,16 +605,206 @@
 
 .strategy-content {
   background-color: rgba(52, 152, 219, 0.05);
-  padding: 1rem;
   border-radius: 4px;
   font-size: 0.9rem;
-  white-space: pre-wrap;
   overflow-x: auto;
 }
 
-.strategy-content p {
-  margin: 0.5rem 0;
-  line-height: 1.4;
+/* Estilos específicos para el contenido HTML generado por Claude */
+.strategy-content .strategy-section {
+  margin-bottom: 25px;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.strategy-content .section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #2c3e50;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 8px;
+}
+
+.strategy-content .strategy-code {
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  padding: 15px;
+  overflow-x: auto;
+  border: 1px solid #e9ecef;
+  margin: 15px 0;
+}
+
+.strategy-content .strategy-code pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+}
+
+.strategy-content .copy-btn {
+  background-color: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.strategy-content .copy-btn:hover {
+  opacity: 1;
+  background-color: #f8f9fa;
+}
+
+/* Estilos para las métricas y badges */
+.strategy-content .search-metrics {
+  margin-top: 20px;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.strategy-content .metrics-title {
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #495057;
+  font-size: 0.9rem;
+}
+
+.strategy-content .metrics-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.strategy-content .metric-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 30px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.strategy-content .metric-badge.success {
+  background-color: #2ecc71;
+}
+
+.strategy-content .metric-badge.warning {
+  background-color: #f39c12;
+}
+
+.strategy-content .metric-badge.danger {
+  background-color: #e74c3c;
+}
+
+.strategy-content .metric-name {
+  margin-right: 5px;
+}
+
+.strategy-content .metric-value {
+  font-weight: 700;
+}
+
+/* Estilos para términos y análisis PICO */
+.strategy-content .pico-summary {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border-left: 4px solid #3498db;
+}
+
+.strategy-content .pico-summary h4 {
+  color: #2c3e50;
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.strategy-content .pico-summary-list {
+  list-style-type: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.strategy-content .pico-summary-list li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.strategy-content .pico-summary-list strong {
+  color: #3498db;
+  font-weight: 600;
+}
+
+.strategy-content .relevance-text {
+  background-color: #e1f5fe;
+  color: #01579b;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+.strategy-content .pico-grid {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.strategy-content .pico-letter {
+  font-weight: bold;
+  color: #3498db;
+  width: 18px;
+}
+
+.strategy-content .relevance-badge {
+  display: inline-block;
+  background-color: #3498db;
+  color: white;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.strategy-content .terms-section ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.strategy-content .terms-section li {
+  margin-bottom: 5px;
+}
+
+@media (max-width: 768px) {
+  .strategy-content .metrics-badges {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .search-strategy {
+    padding: 1rem;
+  }
+  
+  .strategy-content {
+    padding: 0;
+    font-size: 0.85rem;
+  }
 }
 
 .results-placeholder {

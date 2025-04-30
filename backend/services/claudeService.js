@@ -6,6 +6,7 @@ import axios from 'axios';
 import config from '../config/index.js';
 import { generateSynthesisPrompt } from '../utils/aiPrompts.js';
 import Article from '../models/Article.js';
+import { extractMetricsFromText, formatMetrics, getMetricsBadgeStyles } from '../utils/metricsCalculator.js';
 
 /**
  * Función para registro de información con timestamp
@@ -17,8 +18,7 @@ function logInfo(method, message, data = null) {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] [Claude] [${method}] ${message}`);
   if (data) {
-    console.log(`[${timestamp}] [Claude] [${method}] Datos:`, 
-      typeof data === 'string' ? data : JSON.stringify(data, null, 2));
+    console.log(`[${timestamp}] [Claude] [${method}] Datos:`, data);
   }
 }
 
@@ -268,6 +268,9 @@ INSTRUCCIONES PRECISAS:
      * Número estimado de resultados (busca entre 50-70)
      * Precisión esperada (% de artículos que serán relevantes)
      * Sensibilidad estimada (% de todos los artículos relevantes que capturará)
+     * Especificidad estimada (% de artículos irrelevantes correctamente descartados)
+     * NNR estimado (número necesario a leer para encontrar un artículo relevante)
+     * Saturación informativa (% de conceptos potenciales capturados en los resultados)
    - Si una estrategia produce >100 resultados, restringe más
    - Si produce <30 resultados, haz una versión alternativa menos restrictiva
 
@@ -289,6 +292,9 @@ INSTRUCCIONES PRECISAS:
       - Número estimado de resultados: [40-80]
       - Precisión estimada: [%]
       - Sensibilidad estimada: [%]
+      - Especificidad estimada: [%]
+      - NNR estimado: [valor]
+      - Saturación estimada: [%]
    
    d) ESTRATEGIA ALTERNATIVA:
       - Una versión ligeramente diferente si la principal está fuera del rango objetivo
@@ -309,7 +315,7 @@ INSTRUCCIONES PRECISAS:
    AND 
    ("Proliferative Vitreoretinopathy"[Mesh] OR "PVR"[ti] OR "proliferative vitreoretinopathy"[ti])
    
-   Estimación: ~65 resultados, 80% precisión, 75% sensibilidad
+   Estimación: ~65 resultados, 80% precisión, 75% sensibilidad, 90% especificidad, NNR: 1.25, 85% saturación
 
 7. TÉCNICAS ESPECÍFICAS PARA CALIBRACIÓN DE RESULTADOS:
    - Uso de [Majr] para términos MeSH como tema principal
@@ -393,10 +399,24 @@ Pregunta clínica: ${clinicalQuestion}`;
         logInfo(method, 'No se pudo extraer automáticamente la estrategia del texto completo');
       }
       
-      // Retornar un objeto con la estrategia extraída y el texto completo
+      // Extraer métricas del texto de respuesta
+      const extractedMetrics = extractMetricsFromText(response);
+      
+      // Formatear las métricas y obtener los badges
+      const formattedMetrics = formatMetrics(extractedMetrics);
+      
+      // Formatear la estrategia para mejor visualización
+      const formattedStrategy = extractedStrategy ? this.formatSearchStrategy(extractedStrategy) : '';
+      
+      // Generar el HTML mejorado para la estrategia
+      const enhancedResponse = this.formatEnhancedResponse(response, formattedStrategy, formattedMetrics);
+      
+      // Retornar un objeto con todos los componentes
       return {
-        strategy: extractedStrategy || '',  // La estrategia extraída o cadena vacía si no se encontró
-        fullResponse: response             // La respuesta completa de Claude como respaldo
+        strategy: extractedStrategy || '',  // La estrategia extraída o cadena vacía
+        fullResponse: response,             // La respuesta completa de Claude como respaldo
+        enhancedResponse: enhancedResponse, // Versión visualmente mejorada para el frontend
+        metrics: extractedMetrics           // Métricas extraídas
       };
     } catch (error) {
       logError(method, 'Error al generar estrategia de búsqueda', error);
@@ -404,6 +424,841 @@ Pregunta clínica: ${clinicalQuestion}`;
     }
   }
   
+  /**
+   * Formatea la estrategia de búsqueda para mejorar su visualización
+   * @param {string} strategy - Estrategia de búsqueda cruda
+   * @returns {string} Estrategia formateada con HTML
+   */
+  formatSearchStrategy(strategy) {
+    if (!strategy) return '';
+    
+    // Dividir la estrategia en componentes y operadores
+    const components = [];
+    let currentComponent = '';
+    let depth = 0;
+    let openQuotes = false;
+    
+    // Procesar cada carácter para una división más precisa
+    for (let i = 0; i < strategy.length; i++) {
+      const char = strategy[i];
+      
+      if (char === '"') {
+        openQuotes = !openQuotes;
+        currentComponent += char;
+      } else if (char === '(' && !openQuotes) {
+        depth++;
+        if (depth === 1 && currentComponent.trim()) {
+          components.push({type: 'operator', content: currentComponent.trim()});
+          currentComponent = '';
+        }
+        currentComponent += char;
+      } else if (char === ')' && !openQuotes) {
+        depth--;
+        currentComponent += char;
+        if (depth === 0) {
+          components.push({type: 'block', content: currentComponent.trim()});
+          currentComponent = '';
+        }
+      } else {
+        currentComponent += char;
+      }
+    }
+    
+    // Agregar cualquier parte restante
+    if (currentComponent.trim()) {
+      if (currentComponent.trim().match(/AND|OR|NOT/)) {
+        components.push({type: 'operator', content: currentComponent.trim()});
+      } else {
+        components.push({type: 'text', content: currentComponent.trim()});
+      }
+    }
+    
+    // Construir el HTML con formato y colores
+    let formattedHtml = '<div class="strategy-components">';
+    
+    components.forEach((component, index) => {
+      if (component.type === 'operator') {
+        // Operadores lógicos
+        formattedHtml += `<div class="strategy-operator">${this.escapeHtml(component.content)}</div>`;
+      } else if (component.type === 'block') {
+        // Bloques de búsqueda (términos entre paréntesis)
+        const content = component.content;
+        // Resaltar elementos MeSH y otros términos especiales
+        let highlightedContent = content
+          .replace(/(".*?"(?:\[.*?\])?)/g, '<span class="strategy-term">$1</span>')
+          .replace(/\[(.*?)\]/g, '<span class="strategy-field">[$1]</span>')
+          .replace(/(\s+OR\s+)/g, '<span class="strategy-or">$1</span>')
+          .replace(/(\s+AND\s+)/g, '<span class="strategy-and">$1</span>')
+          .replace(/(\s+NOT\s+)/g, '<span class="strategy-not">$1</span>');
+          
+        formattedHtml += `<div class="strategy-block">${highlightedContent}</div>`;
+      } else {
+        // Texto normal
+        formattedHtml += `<div class="strategy-text">${this.escapeHtml(component.content)}</div>`;
+      }
+    });
+    
+    formattedHtml += '</div>';
+    
+    // Añadir botón de copia y estilos
+    const strategyForCopy = strategy.replace(/[\n\r\s]+/g, ' ');
+    
+    // Crear un ID único para esta estrategia
+    const strategyId = 'strategy-' + Math.random().toString(36).substring(2, 15);
+    
+    return `<div class="strategy-container">
+      <div class="strategy-header">
+        <div class="strategy-title">Estrategia optimizada para PubMed</div>
+        <button class="copy-btn" onclick="copyStrategy('${strategyId}')">
+          <span class="copy-icon">📋</span> Copiar
+        </button>
+      </div>
+      <div class="strategy-code">
+        ${formattedHtml}
+      </div>
+      <div class="strategy-footer">
+        <div class="strategy-tip">
+          <span class="tip-icon">💡</span>
+          <span class="tip-text">Para usar esta estrategia, cópiela y péguela en el cuadro de búsqueda de PubMed</span>
+        </div>
+      </div>
+      <textarea id="${strategyId}" style="position: absolute; top: -9999px; left: -9999px;">${strategyForCopy}</textarea>
+    </div>
+    
+    <script>
+    function copyStrategy(id) {
+      const textarea = document.getElementById(id);
+      textarea.select();
+      document.execCommand('copy');
+      
+      // O usar Clipboard API si está disponible
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textarea.value)
+          .then(() => {
+            // Feedback visual opcional
+            const btn = document.querySelector(\`[onclick="copyStrategy('\${id}')"]\`);
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="copy-icon">✓</span> Copiado';
+            setTimeout(() => {
+              btn.innerHTML = originalText;
+            }, 2000);
+          })
+          .catch(err => {
+            console.error('Error al copiar: ', err);
+          });
+      }
+    }
+    </script>
+    
+    <style>
+      .strategy-container {
+        position: relative;
+        margin: 20px 0;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+      }
+      
+      .strategy-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #f1f8ff;
+        padding: 12px 15px;
+        border-bottom: 1px solid #e1e8ed;
+      }
+      
+      .strategy-title {
+        font-weight: 600;
+        color: #2c3e50;
+        font-size: 0.95rem;
+      }
+      
+      .strategy-code {
+        background-color: #f8f9fa;
+        padding: 15px;
+        overflow-x: auto;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      
+      .strategy-components {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      
+      .strategy-block {
+        padding: 10px;
+        background-color: #fff;
+        border-radius: 6px;
+        border-left: 3px solid #3498db;
+      }
+      
+      .strategy-operator {
+        align-self: center;
+        font-weight: bold;
+        color: #34495e;
+        background-color: #f0f0f0;
+        padding: 3px 10px;
+        border-radius: 4px;
+        margin: 4px 0;
+      }
+      
+      .strategy-term {
+        color: #2980b9;
+        font-weight: 600;
+      }
+      
+      .strategy-field {
+        color: #16a085;
+        font-weight: 500;
+      }
+      
+      .strategy-or {
+        color: #e67e22;
+        font-weight: bold;
+      }
+      
+      .strategy-and {
+        color: #27ae60;
+        font-weight: bold;
+      }
+      
+      .strategy-not {
+        color: #c0392b;
+        font-weight: bold;
+      }
+      
+      .copy-btn {
+        background-color: #fff;
+        border: 1px solid #dce0e5;
+        border-radius: 4px;
+        padding: 6px 12px;
+        font-size: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+      }
+      
+      .copy-btn:hover {
+        background-color: #f1f8ff;
+        border-color: #3498db;
+      }
+      
+      .copy-icon {
+        font-size: 14px;
+      }
+      
+      .strategy-footer {
+        padding: 10px 15px;
+        background-color: #f9f9f9;
+        border-top: 1px solid #e9ecef;
+      }
+      
+      .strategy-tip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.85rem;
+        color: #6c757d;
+      }
+      
+      .tip-icon {
+        color: #f39c12;
+      }
+      
+      @media (max-width: 768px) {
+        .strategy-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 10px;
+        }
+        
+        .copy-btn {
+          align-self: flex-end;
+        }
+      }
+    </style>`;
+  }
+
+  /**
+   * Formatea la respuesta mejorada combinando texto original, estrategia formateada y badges
+   * @param {string} originalResponse - Respuesta completa de Claude
+   * @param {string} formattedStrategy - Estrategia formateada con HTML
+   * @param {Object} metrics - Métricas formateadas con badges
+   * @returns {string} HTML con toda la información integrada
+   */
+  formatEnhancedResponse(originalResponse, formattedStrategy, metrics) {
+    // Extraer secciones importantes de la respuesta original
+    const picoSection = this.extractSection(originalResponse, /ANÁLISIS PICO[^]*?(?=TÉRMINOS PRECISOS|$)/is);
+    const termsSection = this.extractSection(originalResponse, /TÉRMINOS PRECISOS[^]*?(?=ESTRATEGIA PRINCIPAL|$)/is);
+
+    // Formatear el análisis PICO en un formato más visual
+    const formattedPico = this.formatPicoSection(picoSection);
+
+    // Formatear la sección de términos precisos
+    const formattedTerms = this.formatTermsSection(termsSection);
+
+    // Construir el HTML mejorado
+    const styles = `<style>
+    .enhanced-strategy {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.5;
+      color: #333;
+      max-width: 900px;
+      margin: 0 auto;
+      background-color: #fff;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    }
+    
+    .strategy-banner {
+      background: linear-gradient(135deg, #4b6cb7, #182848);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .banner-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    
+    .banner-subtitle {
+      font-size: 0.95rem;
+      opacity: 0.9;
+    }
+    
+    .strategy-section {
+      margin-bottom: 0;
+      padding: 25px;
+      background-color: white;
+      border-bottom: 1px solid #edf2f7;
+    }
+    
+    .strategy-section:last-child {
+      border-bottom: none;
+    }
+    
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 15px;
+      color: #2c3e50;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .section-title::before {
+      content: "";
+      display: block;
+      width: 4px;
+      height: 20px;
+      background-color: #4b6cb7;
+      border-radius: 2px;
+    }
+    
+    .pico-grid {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      column-gap: 15px;
+      row-gap: 20px;
+      align-items: start;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    
+    .pico-component {
+      display: contents;
+    }
+    
+    .pico-letter {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #4b6cb7;
+      color: white;
+      font-weight: bold;
+      border-radius: 50%;
+    }
+    
+    .pico-content {
+      line-height: 1.5;
+    }
+    
+    .pico-title {
+      font-weight: 600;
+      color: #2c3e50;
+      margin-bottom: 4px;
+    }
+    
+    .pico-description {
+      color: #4a5568;
+      font-size: 0.95rem;
+    }
+    
+    .relevance-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      height: 32px;
+      background-color: #ebf5ff;
+      color: #3182ce;
+      border-radius: 16px;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    .relevance-5 { background-color: #c6f6d5; color: #38a169; }
+    .relevance-4 { background-color: #d6f5fb; color: #319795; }
+    .relevance-3 { background-color: #fefcbf; color: #d69e2e; }
+    .relevance-2 { background-color: #fed7d7; color: #e53e3e; }
+    .relevance-1 { background-color: #e2e8f0; color: #718096; }
+    
+    .terms-section {
+      background-color: #f9fafc;
+    }
+    
+    .terms-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    
+    .terms-group {
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      overflow: hidden;
+    }
+    
+    .terms-header {
+      background-color: #edf2f7;
+      padding: 10px 15px;
+      font-weight: 600;
+      color: #2d3748;
+    }
+    
+    .terms-list {
+      padding: 15px;
+      list-style-position: inside;
+      margin: 0;
+    }
+    
+    .terms-list li {
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+      color: #4a5568;
+    }
+    
+    .mesh-term {
+      color: #4299e1;
+      font-weight: 500;
+    }
+    
+    .tiab-term {
+      color: #805ad5;
+      font-weight: 500;
+    }
+    
+    .advanced-strategy {
+      background-color: #fafafc;
+    }
+    
+    .complete-response {
+      background-color: #f8fafc;
+    }
+    
+    details summary {
+      cursor: pointer;
+      color: #4a5568;
+      font-weight: 500;
+      margin-bottom: 10px;
+      user-select: none;
+    }
+    
+    details summary:hover {
+      color: #3182ce;
+    }
+    
+    .full-response {
+      background-color: white;
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #e2e8f0;
+    }
+    
+    @media (max-width: 768px) {
+      .strategy-banner {
+        padding: 15px;
+      }
+      
+      .banner-title {
+        font-size: 1.2rem;
+      }
+      
+      .strategy-section {
+        padding: 15px;
+      }
+      
+      .pico-grid {
+        grid-template-columns: auto 1fr;
+      }
+      
+      .relevance-badge {
+        grid-column: 2;
+        margin-top: 5px;
+        justify-self: start;
+      }
+    }
+    
+    ${getMetricsBadgeStyles()}
+  </style>`;
+
+    // Construir el HTML
+    return `${styles}
+  <div class="enhanced-strategy">
+    <div class="strategy-banner">
+      <div class="banner-title">Estrategia de Búsqueda Optimizada</div>
+      <div class="banner-subtitle">Generada por IA para maximizar precisión y relevancia</div>
+    </div>
+    
+    <div class="strategy-section">
+      <div class="section-title">Análisis PICO de la Pregunta</div>
+      <div class="pico-content">
+        ${formattedPico || '<p>No se pudo extraer el análisis PICO.</p>'}
+      </div>
+    </div>
+    
+    <div class="strategy-section terms-section">
+      <div class="section-title">Términos Seleccionados</div>
+      <div class="terms-content">
+        ${formattedTerms || '<p>No se pudo extraer la lista de términos.</p>'}
+      </div>
+    </div>
+    
+    <div class="strategy-section advanced-strategy">
+      <div class="section-title">Estrategia de Búsqueda Optimizada</div>
+      ${formattedStrategy || '<p>No se pudo extraer la estrategia de búsqueda.</p>'}
+      ${metrics.badges}
+    </div>
+    
+    <div class="strategy-section complete-response">
+      <div class="section-title">Respuesta Completa</div>
+      <details>
+        <summary>Mostrar respuesta completa de Claude</summary>
+        <div class="full-response">
+          ${originalResponse.replace(/\n/g, '<br>')}
+        </div>
+      </details>
+    </div>
+  </div>`;
+  }
+  
+  /**
+   * Formatea la sección PICO para una mejor visualización
+   * @param {string} picoSection - Texto de la sección PICO
+   * @returns {string} HTML con formato mejorado
+   */
+  formatPicoSection(picoSection) {
+    if (!picoSection) return '';
+    
+    // Extraer componentes PICO con sus valores de relevancia
+    const components = [
+      {
+        letter: 'P',
+        title: 'Población',
+        pattern: /P:?\s*\[([^\]]+)\](?:.*?)-\s*([^-]+)(?:.*?[Rr]elevancia:?\s*(\d)[^\d]?)?/s
+      },
+      {
+        letter: 'I',
+        title: 'Intervención',
+        pattern: /I:?\s*\[([^\]]+)\](?:.*?)-\s*([^-]+)(?:.*?[Rr]elevancia:?\s*(\d)[^\d]?)?/s
+      },
+      {
+        letter: 'C',
+        title: 'Comparador',
+        pattern: /C:?\s*\[([^\]]+)\](?:.*?)-\s*([^-]+)(?:.*?[Rr]elevancia:?\s*(\d)[^\d]?)?/s
+      },
+      {
+        letter: 'O',
+        title: 'Resultados',
+        pattern: /O:?\s*\[([^\]]+)\](?:.*?)-\s*([^-]+)(?:.*?[Rr]elevancia:?\s*(\d)[^\d]?)?/s
+      }
+    ];
+    
+    // Generar resumen PICO al principio para mayor visibilidad
+    let summaryHtml = '<div class="pico-summary">';
+    summaryHtml += '<h4>ANÁLISIS PICO PRIORIZADO:</h4>';
+    summaryHtml += '<ul class="pico-summary-list">';
+    
+    // Extraer componentes PICO específicos para el análisis detallado
+    let picoDetails = {};
+    
+    components.forEach(component => {
+      const match = picoSection.match(component.pattern);
+      
+      if (match) {
+        const title = match[1].trim();
+        const description = match[2].trim();
+        const relevance = match[3] ? parseInt(match[3], 10) : 3;
+        
+        // Guardar los detalles para uso posterior
+        picoDetails[component.letter] = {
+          title: title,
+          description: description,
+          relevance: relevance
+        };
+        
+        // Agregar al resumen
+        summaryHtml += `<li><strong>${component.letter}: [${title}]</strong> - ${description}: <span class="relevance-text">Relevancia ${relevance}</span></li>`;
+      }
+    });
+    
+    summaryHtml += '</ul></div>';
+    
+    // Construir un patrón alternativo para capturar datos si el patrón principal falló
+    if (Object.keys(picoDetails).length === 0) {
+      // Intentar otro patrón para encontrar los componentes PICO
+      const altPattern = /-\s*([P|I|C|O]):\s*\[([^\]]+)\]\s*-\s*([^-]+)(?:.*?[Rr]elevancia:?\s*(\d))?/g;
+      let match;
+      
+      while ((match = altPattern.exec(picoSection)) !== null) {
+        const letter = match[1].toUpperCase();
+        const title = match[2].trim();
+        const description = match[3].trim();
+        const relevance = match[4] ? parseInt(match[4], 10) : 3;
+        
+        picoDetails[letter] = {
+          title: title,
+          description: description,
+          relevance: relevance
+        };
+      }
+      
+      // Generar nuevamente el resumen si encontramos datos con el patrón alternativo
+      if (Object.keys(picoDetails).length > 0) {
+        summaryHtml = '<div class="pico-summary">';
+        summaryHtml += '<h4>ANÁLISIS PICO PRIORIZADO:</h4>';
+        summaryHtml += '<ul class="pico-summary-list">';
+        
+        for (const [letter, details] of Object.entries(picoDetails)) {
+          summaryHtml += `<li><strong>${letter}: [${details.title}]</strong> - ${details.description}: <span class="relevance-text">Relevancia ${details.relevance}</span></li>`;
+        }
+        
+        summaryHtml += '</ul></div>';
+      }
+    }
+    
+    // Intentar extraer directamente si los métodos anteriores fallan
+    if (Object.keys(picoDetails).length === 0) {
+      // Este es un patrón más genérico que intenta capturar cualquier formato
+      const lines = picoSection.split('\n');
+      
+      for (const line of lines) {
+        if (line.trim() === '') continue;
+        
+        // Buscar líneas con formato "- X: [Title] - Description - Relevancia: N"
+        const basicMatch = line.match(/(?:^|\s)([PICO]):\s*\[([^\]]+)\](?:.*?)-\s*([^-]+)(?:.*?[Rr]elevancia:?\s*(\d))?/);
+        
+        if (basicMatch) {
+          const letter = basicMatch[1].toUpperCase();
+          const title = basicMatch[2].trim();
+          const description = basicMatch[3].trim();
+          const relevance = basicMatch[4] ? parseInt(basicMatch[4], 10) : 3;
+          
+          picoDetails[letter] = {
+            title: title,
+            description: description,
+            relevance: relevance
+          };
+        }
+      }
+      
+      // Regenerar el resumen con los datos encontrados
+      if (Object.keys(picoDetails).length > 0) {
+        summaryHtml = '<div class="pico-summary">';
+        summaryHtml += '<h4>ANÁLISIS PICO PRIORIZADO:</h4>';
+        summaryHtml += '<ul class="pico-summary-list">';
+        
+        for (const [letter, details] of Object.entries(picoDetails)) {
+          summaryHtml += `<li><strong>${letter}: [${details.title}]</strong> - ${details.description}: <span class="relevance-text">Relevancia ${details.relevance}</span></li>`;
+        }
+        
+        summaryHtml += '</ul></div>';
+      }
+    }
+    
+    // Luego generar la cuadrícula visual detallada
+    let picoHtml = '<ul class="pico-grid">';
+    
+    components.forEach(component => {
+      const details = picoDetails[component.letter];
+      
+      if (details) {
+        picoHtml += `
+          <li class="pico-component">
+            <div class="pico-letter">${component.letter}</div>
+            <div class="pico-content">
+              <div class="pico-title">${component.title}</div>
+              <div class="pico-description">${details.description}</div>
+            </div>
+            <div class="relevance-badge relevance-${details.relevance}">${details.relevance}</div>
+          </li>
+        `;
+      } else {
+        // Si no tenemos datos específicos, usar valores genéricos
+        picoHtml += `
+          <li class="pico-component">
+            <div class="pico-letter">${component.letter}</div>
+            <div class="pico-content">
+              <div class="pico-title">${component.title}</div>
+              <div class="pico-description">${component.title}</div>
+            </div>
+            <div class="relevance-badge relevance-3">3</div>
+          </li>
+        `;
+      }
+    });
+    
+    picoHtml += '</ul>';
+    
+    // Combinar el resumen y la cuadrícula
+    return summaryHtml + picoHtml;
+  }
+  
+  /**
+   * Formatea la sección de términos para una mejor visualización
+   * @param {string} termsSection - Texto de la sección de términos
+   * @returns {string} HTML con formato mejorado
+   */
+  formatTermsSection(termsSection) {
+    if (!termsSection) return '';
+    
+    // Extraer grupos de términos (puede haber varios conceptos)
+    const conceptMatches = termsSection.match(/Concepto \d+:([^]*?)(?=Concepto \d+:|$)/g);
+    
+    if (!conceptMatches) return termsSection;
+    
+    let termsHtml = '<div class="terms-container">';
+    
+    conceptMatches.forEach((conceptBlock, index) => {
+      // Extraer nombre del concepto
+      const conceptMatch = conceptBlock.match(/Concepto \d+:(.+?)(?=\[|\n|$)/);
+      const conceptName = conceptMatch ? conceptMatch[1].trim() : `Concepto ${index + 1}`;
+      
+      // Buscar términos MeSH y términos de texto libre
+      const meshTerms = [];
+      const tiabTerms = [];
+      
+      // Buscar términos MeSH
+      const meshMatches = conceptBlock.match(/["'][^"']+["']\[Mesh[^\]]*\]/g);
+      if (meshMatches) {
+        meshMatches.forEach(term => {
+          meshTerms.push(term.trim());
+        });
+      }
+      
+      // Buscar términos tiab (texto en título/resumen)
+      const tiabMatches = conceptBlock.match(/["'][^"']+["']\[tiab\]/g);
+      if (tiabMatches) {
+        tiabMatches.forEach(term => {
+          tiabTerms.push(term.trim());
+        });
+      }
+      
+      // Si no se encontraron términos específicos, dividir por líneas o comas
+      if (meshTerms.length === 0 && tiabTerms.length === 0) {
+        const terms = conceptBlock
+          .replace(/Concepto \d+:.+?\n/g, '')
+          .split(/[,\n]/)
+          .map(t => t.trim())
+          .filter(t => t && t.length > 1);
+        
+        terms.forEach(term => {
+          if (term.includes('[Mesh') || term.includes('MeSH')) {
+            meshTerms.push(term);
+          } else if (term.includes('[tiab') || term.toLowerCase().includes('texto libre')) {
+            tiabTerms.push(term);
+          } else {
+            // Si no podemos determinar el tipo, asumimos que es un término general
+            tiabTerms.push(term);
+          }
+        });
+      }
+      
+      // Generar HTML para este grupo de términos
+      termsHtml += `
+        <div class="terms-group">
+          <div class="terms-header">${conceptName}</div>
+          <ul class="terms-list">
+      `;
+      
+      // Añadir términos MeSH
+      if (meshTerms.length > 0) {
+        meshTerms.forEach(term => {
+          termsHtml += `<li><span class="mesh-term">${term}</span></li>`;
+        });
+      }
+      
+      // Añadir términos tiab
+      if (tiabTerms.length > 0) {
+        tiabTerms.forEach(term => {
+          termsHtml += `<li><span class="tiab-term">${term}</span></li>`;
+        });
+      }
+      
+      termsHtml += `
+          </ul>
+        </div>
+      `;
+    });
+    
+    termsHtml += '</div>';
+    return termsHtml;
+  }
+
+  /**
+   * Extrae una sección específica del texto de respuesta usando regex
+   * @param {string} text - Texto completo
+   * @param {RegExp} pattern - Patrón para extraer la sección
+   * @returns {string} Sección extraída o cadena vacía
+   */
+  extractSection(text, pattern) {
+    const match = text.match(pattern);
+    return match ? match[0] : '';
+  }
+
+  /**
+   * Escapa caracteres especiales para su uso en HTML
+   * @param {string} text - Texto a escapar
+   * @returns {string} Texto escapado
+   */
+  escapeHtml(text) {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   /**
    * Analiza un artículo científico en relación a una pregunta clínica
    * @param {Object} article - Artículo científico a analizar
@@ -720,9 +1575,9 @@ Genera un análisis conciso con este formato HTML exacto:
       }));
     }
     
-    // ---- NUEVA IMPLEMENTACIÓN PARA MANEJAR RATE LIMITING ----
+    // ---- IMPLEMENTACIÓN PARA MANEJAR RATE LIMITING ----
     // Incrementar significativamente el tiempo entre solicitudes
-    const delayBetweenRequests = 20000; // 20 segundos entre solicitudes (incrementado desde 10s)
+    const delayBetweenRequests = 20000; // 20 segundos entre solicitudes
     
     // Función para procesar cada artículo con gestión mejorada de errores y rate limits
     const processArticle = async (article, index) => {
@@ -800,6 +1655,9 @@ Genera un análisis conciso con este formato HTML exacto:
         const result = await processArticle(validArticles[i], i);
         results.push(result);
         
+        // Emitir progreso actual a través de socket
+        emitBatchProgress(true, validArticles.length, i + 1);
+        
         // Registrar progreso
         logInfo(method, `Completado artículo ${i+1}/${validArticles.length}`);
         
@@ -823,8 +1681,14 @@ Genera un análisis conciso con este formato HTML exacto:
           error: true,
           analyzed: false
         });
+        
+        // Actualizar progreso incluso en caso de error
+        emitBatchProgress(true, validArticles.length, i + 1);
       }
     }
+    
+    // Finalizar la emisión de progreso
+    emitBatchProgress(false, validArticles.length, validArticles.length);
     
     // Añadir artículos inválidos con mensaje de error
     const invalidArticles = articles.filter(a1 => !validArticles.some(a2 => a2.pmid === a1.pmid));
@@ -964,4 +1828,4 @@ Ejemplo:
 }
 
 // Exportar una instancia del servicio
-export default new ClaudeService(); 
+export default new ClaudeService();

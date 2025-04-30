@@ -56,11 +56,12 @@ const claudeController = {
       const clinicalQuestion = extractClinicalQuestion(prompt);
       
       // Generar estrategia
-      const content = await claudeService.generateSearchStrategy(clinicalQuestion);
+      const strategyResponse = await claudeService.generateSearchStrategy(clinicalQuestion);
       
+      // Devolver la respuesta mejorada con el HTML formateado y los badges
       return res.status(200).json({ 
         success: true,
-        content 
+        content: strategyResponse.enhancedResponse || strategyResponse
       });
     } catch (error) {
       console.error('Error al generar estrategia:', error);
