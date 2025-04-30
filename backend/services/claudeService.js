@@ -119,14 +119,14 @@ class ClaudeService {
         
         logInfo(method, `Enviando solicitud a ${url}`);
         
-        // Aumentar el tiempo de espera a 45 segundos
+        // Aumentar el tiempo de espera a 180 segundos
         const response = await axios.post(url, requestData, {
           headers: {
             'Content-Type': 'application/json',
             'x-api-key': this.apiKey,
             'anthropic-version': '2023-06-01'
           },
-          timeout: 45000 // 45 segundos de timeout
+          timeout: 180000 // 180 segundos (3 minutos) de timeout
         });
         
         const endTime = Date.now();
@@ -1003,14 +1003,10 @@ Pregunta clínica: ${clinicalQuestion}`;
       }
     ];
     
-    // Generar resumen PICO al principio para mayor visibilidad
-    let summaryHtml = '<div class="pico-summary">';
-    summaryHtml += '<h4>ANÁLISIS PICO PRIORIZADO:</h4>';
-    summaryHtml += '<ul class="pico-summary-list">';
-    
     // Extraer componentes PICO específicos para el análisis detallado
     let picoDetails = {};
     
+    // Primero intentar con patrones específicos
     components.forEach(component => {
       const match = picoSection.match(component.pattern);
       
@@ -1025,13 +1021,8 @@ Pregunta clínica: ${clinicalQuestion}`;
           description: description,
           relevance: relevance
         };
-        
-        // Agregar al resumen
-        summaryHtml += `<li><strong>${component.letter}: [${title}]</strong> - ${description}: <span class="relevance-text">Relevancia ${relevance}</span></li>`;
       }
     });
-    
-    summaryHtml += '</ul></div>';
     
     // Construir un patrón alternativo para capturar datos si el patrón principal falló
     if (Object.keys(picoDetails).length === 0) {
@@ -1050,19 +1041,6 @@ Pregunta clínica: ${clinicalQuestion}`;
           description: description,
           relevance: relevance
         };
-      }
-      
-      // Generar nuevamente el resumen si encontramos datos con el patrón alternativo
-      if (Object.keys(picoDetails).length > 0) {
-        summaryHtml = '<div class="pico-summary">';
-        summaryHtml += '<h4>ANÁLISIS PICO PRIORIZADO:</h4>';
-        summaryHtml += '<ul class="pico-summary-list">';
-        
-        for (const [letter, details] of Object.entries(picoDetails)) {
-          summaryHtml += `<li><strong>${letter}: [${details.title}]</strong> - ${details.description}: <span class="relevance-text">Relevancia ${details.relevance}</span></li>`;
-        }
-        
-        summaryHtml += '</ul></div>';
       }
     }
     
@@ -1090,48 +1068,78 @@ Pregunta clínica: ${clinicalQuestion}`;
           };
         }
       }
+    }
+    
+    // Si aún no tenemos detalles, intentar con patrones más generales
+    if (Object.keys(picoDetails).length === 0) {
+      const basicPicoPattern = /([PICO])\s*:\s*(.+?)(?=\s*[PICO]\s*:|$)/gs;
+      let match;
       
-      // Regenerar el resumen con los datos encontrados
-      if (Object.keys(picoDetails).length > 0) {
-        summaryHtml = '<div class="pico-summary">';
-        summaryHtml += '<h4>ANÁLISIS PICO PRIORIZADO:</h4>';
-        summaryHtml += '<ul class="pico-summary-list">';
+      while ((match = basicPicoPattern.exec(picoSection)) !== null) {
+        const letter = match[1].toUpperCase();
+        const fullDescription = match[2].trim();
         
-        for (const [letter, details] of Object.entries(picoDetails)) {
-          summaryHtml += `<li><strong>${letter}: [${details.title}]</strong> - ${details.description}: <span class="relevance-text">Relevancia ${details.relevance}</span></li>`;
-        }
+        // Extraer título y descripción si es posible
+        const titleMatch = fullDescription.match(/\[([^\]]+)\]/);
+        const title = titleMatch ? titleMatch[1].trim() : fullDescription.substring(0, 30) + "...";
         
-        summaryHtml += '</ul></div>';
+        // Eliminar título y otros formatos para extraer la descripción
+        let description = fullDescription.replace(/\[[^\]]+\]/, '').trim();
+        description = description.replace(/^[-:]*/, '').trim();
+        
+        picoDetails[letter] = {
+          title: title,
+          description: description,
+          relevance: 3 // Valor predeterminado
+        };
       }
     }
     
-    // Luego generar la cuadrícula visual detallada
-    let picoHtml = '<ul class="pico-grid">';
+    // Generar resumen PICO al principio para mayor visibilidad
+    let summaryHtml = '<div class="pico-summary" style="margin-bottom: 25px; background-color: #f3f8ff; padding: 18px; border-radius: 8px; border: 1px solid #d0e3ff;">';
+    summaryHtml += '<h4 style="color: #4566e0; margin-top: 0; margin-bottom: 12px; font-size: 16px; border-bottom: 2px solid #e6eeff; padding-bottom: 8px;">ANÁLISIS PICO PRIORIZADO:</h4>';
+    summaryHtml += '<ul class="pico-summary-list" style="margin: 0; padding-left: 20px;">';
     
+    // Si tenemos detalles, agregarlos al resumen
+    if (Object.keys(picoDetails).length > 0) {
+      for (const [letter, details] of Object.entries(picoDetails)) {
+        summaryHtml += `<li style="margin-bottom: 10px;"><strong style="color: #4566e0;">${letter}: [${details.title}]</strong> - ${details.description} <span class="relevance-text" style="font-size: 0.9em; color: #6c47d5;">Relevancia ${details.relevance}</span></li>`;
+      }
+    } else {
+      // Si no pudimos extraer detalles, mostrar mensaje de error
+      summaryHtml += '<li>No se pudieron extraer elementos PICO específicos del análisis.</li>';
+    }
+    
+    summaryHtml += '</ul></div>';
+    
+    // Luego generar la cuadrícula visual detallada
+    let picoHtml = '<ul class="pico-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; list-style: none; padding: 0; margin: 25px 0;">';
+    
+    // Asegurarse de que todos los componentes tengan representación
     components.forEach(component => {
       const details = picoDetails[component.letter];
       
       if (details) {
         picoHtml += `
-          <li class="pico-component">
-            <div class="pico-letter">${component.letter}</div>
-            <div class="pico-content">
-              <div class="pico-title">${component.title}</div>
-              <div class="pico-description">${details.description}</div>
+          <li class="pico-component" style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; display: flex; position: relative; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);">
+            <div class="pico-letter" style="width: 40px; height: 40px; border-radius: 50%; background-color: #4566e0; color: white; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 18px; margin-right: 15px;">${component.letter}</div>
+            <div class="pico-content" style="flex: 1;">
+              <div class="pico-title" style="font-weight: 600; margin-bottom: 5px; color: #333;">${component.title}</div>
+              <div class="pico-description" style="font-size: 14px; color: #555;">${details.description}</div>
             </div>
-            <div class="relevance-badge relevance-${details.relevance}">${details.relevance}</div>
+            <div class="relevance-badge relevance-${details.relevance}" style="position: absolute; top: 10px; right: 10px; width: 25px; height: 25px; border-radius: 50%; background-color: ${details.relevance >= 4 ? '#4566e0' : details.relevance >= 3 ? '#6c47d5' : details.relevance >= 2 ? '#e67e22' : '#e74c3c'}; color: white; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold;">${details.relevance}</div>
           </li>
         `;
       } else {
         // Si no tenemos datos específicos, usar valores genéricos
         picoHtml += `
-          <li class="pico-component">
-            <div class="pico-letter">${component.letter}</div>
-            <div class="pico-content">
-              <div class="pico-title">${component.title}</div>
-              <div class="pico-description">${component.title}</div>
+          <li class="pico-component" style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; display: flex; position: relative; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);">
+            <div class="pico-letter" style="width: 40px; height: 40px; border-radius: 50%; background-color: #4566e0; color: white; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 18px; margin-right: 15px;">${component.letter}</div>
+            <div class="pico-content" style="flex: 1;">
+              <div class="pico-title" style="font-weight: 600; margin-bottom: 5px; color: #333;">${component.title}</div>
+              <div class="pico-description" style="font-size: 14px; color: #555;">No especificado</div>
             </div>
-            <div class="relevance-badge relevance-3">3</div>
+            <div class="relevance-badge relevance-3" style="position: absolute; top: 10px; right: 10px; width: 25px; height: 25px; border-radius: 50%; background-color: #6c47d5; color: white; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold;">3</div>
           </li>
         `;
       }
@@ -1368,6 +1376,27 @@ Tu análisis debe presentarse en formato VISUAL de TARJETA o FICHA TÉCNICA con 
   </div>
   
   <div class="card-section">
+    <h4>ANÁLISIS PICO</h4>
+    <p>Identifica claramente los componentes PICO del estudio. Utiliza el siguiente formato exacto:</p>
+    <ul>
+      <li>P: [Nombre población] - Descripción detallada - Relevancia: # (1-5)</li>
+      <li>I: [Nombre intervención] - Descripción detallada - Relevancia: # (1-5)</li>
+      <li>C: [Nombre comparador] - Descripción detallada - Relevancia: # (1-5)</li>
+      <li>O: [Nombre resultado] - Descripción detallada - Relevancia: # (1-5)</li>
+    </ul>
+  </div>
+  
+  <div class="card-section">
+    <h4>TÉRMINOS PRECISOS</h4>
+    <p>Lista los términos MeSH y de texto libre más apropiados para buscar estudios similares.</p>
+    <p>Concepto 1: Nombre del concepto principal</p>
+    <ul>
+      <li>"Término 1"[Mesh]</li>
+      <li>"Término 2"[tiab]</li>
+    </ul>
+  </div>
+  
+  <div class="card-section">
     <h4>RELEVANCIA CLÍNICA</h4>
     <p>Valoración sobre aplicabilidad de resultados a la práctica.</p>
   </div>
@@ -1384,104 +1413,101 @@ IMPORTANTE:
    - Para calificar con 1 estrella, usa: <span class="badge quality">★☆☆☆☆</span>
 3. INCLUYE el TIPO DE ESTUDIO como un segundo badge junto a la calificación.
 4. COMPLETA todas las secciones requeridas con información concisa y clara.
-5. MANTÉN el análisis breve pero exhaustivo, con énfasis en los puntos más relevantes.`;
+5. MANTÉN el análisis breve pero exhaustivo, con énfasis en los puntos más relevantes.
+6. La sección ANÁLISIS PICO debe estar muy bien detallada, es clave para el análisis.
+7. En TÉRMINOS PRECISOS incluye términos específicos MeSH y términos de texto libre.`;
 
-    // Construir un prompt simplificado para usar en caso de fallo
-    const simplifiedPrompt = `Analiza brevemente el siguiente artículo en relación a esta pregunta clínica:
-Pregunta: ${clinicalQuestion}
-Título: ${title}
-Abstract: ${abstract}
-
-Genera un análisis conciso con este formato HTML exacto:
-
-<div class="card-analysis">
-  <div class="card-header">
-    <h3>ANÁLISIS DE EVIDENCIA</h3>
-    <div class="badges">
-      <span class="badge quality">★★☆☆☆</span>
-      <span class="badge type">Resumen</span>
-    </div>
-  </div>
-  <div class="card-section">
-    <h4>RESUMEN CLÍNICO</h4>
-    <p>[Breve resumen y relevancia]</p>
-  </div>
-  <div class="card-section">
-    <h4>RELEVANCIA CLÍNICA</h4>
-    <p>[Aplicabilidad de resultados]</p>
-  </div>
-</div>`;
-
-    // Función para reintento con backoff exponencial
-    const retryWithExponentialBackoff = async (prompt, maxRetries = 3) => {
-      let lastError;
+    try {
+      // Utilizar exponential backoff para manejar timeout
+      const processResponse = async (prompt, maxRetries = 3) => {
+        let attempt = 0;
+        let lastError;
+        
+        while (attempt < maxRetries) {
+          attempt++;
+          try {
+            logInfo(method, `Intento ${attempt}/${maxRetries} de análisis`);
+            
+            // Tiempo de backoff exponencial: 10s, 20s, 40s...
+            const backoffTime = Math.pow(2, attempt - 1) * 10;
+            
+            const response = await this.generateResponse(prompt, {
+              maxTokens: 2500,
+              temperature: 0.2,
+              timeout: backoffTime * 1000, // Convertir segundos a ms
+            });
+            
+            logInfo(method, `Análisis generado exitosamente en intento ${attempt}`);
+            return response;
+          } catch (error) {
+            lastError = error;
+            logError(method, `Error en intento ${attempt}: ${error.message}`);
+            
+            // Si hemos agotado los reintentos, lanzar el error
+            if (attempt >= maxRetries) {
+              throw error;
+            }
+            
+            // Si tenemos más reintentos, esperar antes del siguiente intento
+            logInfo(method, `Esperando ${backoffTime}s antes del siguiente intento...`);
+            await new Promise(resolve => setTimeout(resolve, backoffTime * 1000));
+          }
+        }
+        
+        throw lastError; // No debería llegar aquí, pero por si acaso
+      };
       
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-          // Añadir retraso exponencial entre intentos (excepto el primero)
-          if (attempt > 0) {
-            const delay = Math.pow(2, attempt) * 3000 + (Math.random() * 1000);
-            logInfo(method, `Reintento ${attempt+1}/${maxRetries} después de ${Math.round(delay/1000)} segundos`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-          } else if (attempt === 0) {
-            // Pequeño retraso aleatorio inicial
-            const randomDelay = Math.floor(Math.random() * 2000) + 1000;
-            logInfo(method, `Añadiendo retraso de ${randomDelay}ms antes de solicitar análisis`);
-            await new Promise(resolve => setTimeout(resolve, randomDelay));
-          }
-          
-          logInfo(method, `Intento ${attempt+1}/${maxRetries}: Longitud del prompt: ${prompt.length} caracteres`);
-          const response = await this.generateResponse(prompt, {
-            temperature: 0.5 + (attempt * 0.1) // Aumentar ligeramente la temperatura en cada reintento
-          });
-          logInfo(method, `Análisis generado exitosamente en intento ${attempt+1}`);
-          return response;
-        } catch (error) {
-          lastError = error;
-          logError(method, `Error en intento ${attempt+1}: ${error.message}`);
-          
-          // Si no es un error de rate limit o si estamos en el último intento, no continuar
-          if ((!error.message || 
-              (!error.message.includes('rate limit') && 
-               !error.message.includes('timeout') && 
-               !error.message.includes('429'))) && 
-              attempt === maxRetries - 1) {
-            throw error;
-          }
+      // Obtener respuesta de Claude con reintentos
+      const response = await processResponse(detailedPrompt);
+      
+      // Procesar la respuesta para extraer y formatear elementos PICO y términos
+      const picoSection = this.extractSection(response, /<div class="card-section">\s*<h4>ANÁLISIS PICO<\/h4>.*?<\/div>/s);
+      const termsSection = this.extractSection(response, /<div class="card-section">\s*<h4>TÉRMINOS PRECISOS<\/h4>.*?<\/div>/s);
+      
+      // Formatear secciones extraídas
+      const formattedPico = this.formatPicoSection(picoSection);
+      const formattedTerms = this.formatTermsSection(termsSection);
+      
+      // Si tenemos análisis PICO formateado, colocarlo al principio de la tarjeta
+      let processedResponse = response;
+      if (formattedPico) {
+        // Reemplazar la sección original PICO con cadena vacía
+        processedResponse = processedResponse.replace(/<div class="card-section">\s*<h4>ANÁLISIS PICO<\/h4>.*?<\/div>/s, '');
+        
+        // Insertar el PICO formateado después del encabezado de la tarjeta
+        processedResponse = processedResponse.replace(
+          /(<div class="card-analysis">.*?<\/div>\s*<\/div>)/s, 
+          `$1\n\n${formattedPico}`
+        );
+      }
+      
+      // Si tenemos términos formateados, colocarlos después del PICO
+      if (formattedTerms) {
+        // Reemplazar la sección original de términos con cadena vacía
+        processedResponse = processedResponse.replace(/<div class="card-section">\s*<h4>TÉRMINOS PRECISOS<\/h4>.*?<\/div>/s, '');
+        
+        // Buscar dónde insertar los términos (después del PICO si existe o después del encabezado)
+        if (formattedPico) {
+          const picoEnd = processedResponse.indexOf(formattedPico) + formattedPico.length;
+          processedResponse = processedResponse.slice(0, picoEnd) + 
+                            `\n\n<div class="terms-section" style="margin: 20px 0;">\n${formattedTerms}\n</div>` +
+                            processedResponse.slice(picoEnd);
+        } else {
+          processedResponse = processedResponse.replace(
+            /(<div class="card-analysis">.*?<\/div>\s*<\/div>)/s, 
+            `$1\n\n<div class="terms-section" style="margin: 20px 0;">\n${formattedTerms}\n</div>`
+          );
         }
       }
       
-      // Si llegamos aquí, todos los reintentos fallaron
-      throw lastError || new Error('Todos los intentos fallaron');
-    };
-
-    try {
-      // Primer intento con el prompt detallado
-      return await retryWithExponentialBackoff(detailedPrompt, 3);
-    } catch (mainError) {
-      logError(method, `Fallo en análisis con prompt detallado: ${mainError.message}. Intentando con prompt simplificado.`);
+      // Asegurarse de que no haya secciones PICO o términos vacías o con "no especificado"
+      processedResponse = processedResponse.replace(/<ul class="pico-grid">\s*<li[^>]*>[^<]*no especificado[^<]*<\/li>\s*<\/ul>/gi, '');
       
-      try {
-        // Si falla, intentar con el prompt simplificado
-        return await retryWithExponentialBackoff(simplifiedPrompt, 2);
-      } catch (fallbackError) {
-        logError(method, `Error en análisis con prompt simplificado: ${fallbackError.message}`);
-        
-        // Si todo falla, devolver un mensaje de error en formato HTML compatible
-        return `<div class="card-analysis">
-  <div class="card-header">
-    <h3>ANÁLISIS DE EVIDENCIA</h3>
-    <div class="badges">
-      <span class="badge quality">★☆☆☆☆</span>
-      <span class="badge type">Error</span>
-    </div>
-  </div>
-  <div class="card-section">
-    <h4>ERROR DE ANÁLISIS</h4>
-    <p>No fue posible analizar este artículo. Error: ${fallbackError.message || 'Desconocido'}</p>
-  </div>
-</div>`;
-      }
+      return processedResponse;
+      
+    } catch (error) {
+      logError(method, `Error al analizar artículo: ${error.message}`);
+      throw error;
     }
   }
 

@@ -28,49 +28,66 @@ Título: ${title}
 Autores: ${authors}
 Fecha: ${publicationDate}
 PMID: ${pmid}
-Abstract: ${abstract.substring(0, 300)}${abstract.length > 300 ? '...' : ''}
-Análisis previo: ${analysis.substring(0, 500)}${analysis.length > 500 ? '...' : ''}
+Abstract: ${abstract.substring(0, 200)}${abstract.length > 200 ? '...' : ''}
+Análisis previo: ${analysis.substring(0, 300)}${analysis.length > 300 ? '...' : ''}
     `;
   }).join('\n\n');
   
-  // Crear un prompt para la síntesis
-  return `Eres Claude, un asistente experto en medicina basada en la evidencia y análisis crítico de literatura científica. 
-
-Tu tarea es crear una síntesis crítica de la evidencia científica para responder a la siguiente pregunta clínica:
+  // Crear un prompt para la síntesis optimizado para ser más eficiente y contrastante
+  return `Eres un experto en medicina basada en evidencia y meta-análisis. Crea una síntesis de la evidencia científica con enfoque meta-analítico y contraste de autores para responder:
 
 PREGUNTA CLÍNICA: "${clinicalQuestion}"
 
-He analizado previamente varios artículos científicos relacionados con esta pregunta. A continuación te proporciono la información extraída de estos artículos, incluyendo títulos, autores, fechas, abstracts y un análisis previo de cada uno:
-
+INFORMACIÓN DE ARTÍCULOS:
 ${articlesInfo}
 
-INSTRUCCIONES PARA LA SÍNTESIS:
+INSTRUCCIONES PARA META-ANÁLISIS (FORMATO CONCISO):
 
-1. INTRODUCCIÓN:
-   - Presenta brevemente la pregunta clínica y su relevancia
-   - Menciona el número de artículos revisados y sus características generales (tipos de estudios, fechas, poblaciones)
-   
-2. CUERPO PRINCIPAL:
-   - Organiza la evidencia por temas o hallazgos principales, no por artículo individual
-   - Contrasta los resultados cuando haya discrepancias entre estudios
-   - Destaca los acuerdos y desacuerdos entre autores
-   - Evalúa críticamente la calidad metodológica de los estudios
-   - Presenta los hallazgos de mayor a menor nivel de evidencia
-   - Identifica posibles sesgos o limitaciones en el conjunto de la evidencia
-   - Cita los artículos usando el formato (Autor principal et al., año)
-   
-3. CONCLUSIÓN:
-   - Resume la respuesta a la pregunta clínica según la evidencia analizada
-   - Indica el nivel de certeza/incertidumbre en las conclusiones
-   - Menciona las limitaciones de la evidencia disponible
-   - Sugiere áreas para investigación futura si es pertinente
-   
-4. FORMATO Y ESTILO:
-   - Utiliza un lenguaje científico pero accesible
-   - Estructura el texto con encabezados y párrafos claros
-   - Incluye formato HTML para mejorar la legibilidad (títulos <h4>, párrafos <p>, etc.)
-   - Crea una síntesis científica rigurosa pero concisa (aproximadamente 1000-1500 palabras)
-   - Usa un tono académico pero directo
-   
-Genera una síntesis crítica completa en formato HTML, que evalúe objetivamente la evidencia disponible para responder a la pregunta clínica planteada.`;
+1. HETEROGENEIDAD:
+   - Calcula e interpreta I² (<25% baja, 25-50% moderada, >50% alta)
+   - Reporta Q de Cochran (con valor p)
+   - Determina si es adecuado un meta-análisis
+
+2. SÍNTESIS CUANTITATIVA:
+   - Usa modelo de efectos aleatorios si hay heterogeneidad moderada/alta
+   - Proporciona efectos combinados con IC 95%
+   - Incluye pesos por estudio
+   - Presenta datos para forest plot
+
+3. ANÁLISIS CUALITATIVO CON CONTRASTE:
+   - Organiza por temas, no por artículo
+   - Contrasta explícitamente opiniones divergentes entre autores usando frases como "En contraste con X, el autor Y sostiene que..."
+   - Identifica puntos de acuerdo y desacuerdo entre los estudios
+   - Usa frases de transición como "Por otro lado...", "Sin embargo...", "A diferencia de..."
+   - Evalúa con metodología GRADE
+   - Cita con formato (Autor et al., año)
+
+4. DEBATE DE EVIDENCIA:
+   - Incluye una sección específica titulada "Controversias y debate" que presente diferentes posturas
+   - Expone argumentos y contraargumentos entre los estudios
+   - Evalúa críticamente las fortalezas y debilidades metodológicas que pueden explicar resultados contradictorios
+   - Termina con conclusiones balanceadas que reconozcan la diversidad de opiniones
+
+5. FORMATO HTML:
+   - Usa este formato para heterogeneidad:
+     <div class="heterogeneity-stats">
+       <div class="heterogeneity-stat">
+         <span class="stat-name">I²</span>
+         <span class="stat-value">42%</span>
+         <span class="stat-interpretation">Heterogeneidad moderada</span>
+       </div>
+       <div class="heterogeneity-stat">
+         <span class="stat-name">Q de Cochran</span>
+         <span class="stat-value">15.3 (p=0.084)</span>
+       </div>
+     </div>
+
+   - Usa este formato para la tabla meta-analítica:
+     <table class="meta-table">
+       <tr><th>Estudio</th><th>Año</th><th>OR [IC 95%]</th><th>Peso</th></tr>
+       <tr><td>Smith et al.</td><td>2023</td><td class="ci-value">1.75 [1.32-2.31]</td><td class="weight">45%</td></tr>
+       <tr class="combined-effect"><td colspan="2">Efecto combinado</td><td class="ci-value">1.82 [1.45-2.28]</td><td class="weight">100%</td></tr>
+     </table>
+
+Genera una síntesis HTML concisa (max. 1500 palabras) con estadísticas de heterogeneidad, tabla meta-analítica, clara contraposición de opiniones entre autores y conclusiones balanceadas basadas en GRADE.`;
 } 

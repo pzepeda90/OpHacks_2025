@@ -277,8 +277,54 @@ const claudeController = {
         });
       }
       
-      // Generar síntesis
-      const synthesis = await claudeService.generateSynthesis(clinicalQuestion, articles);
+      // Configurar parámetros para reintentos
+      const maxRetries = 3;
+      let currentRetry = 0;
+      let lastError = null;
+      let synthesis = null;
+      
+      // Implementar backoff exponencial para reintentos
+      while (currentRetry < maxRetries) {
+        try {
+          // Si es un reintento, esperar con backoff exponencial
+          if (currentRetry > 0) {
+            const backoffDelay = Math.pow(2, currentRetry) * 5000; // 10s, 20s, 40s
+            console.log(`Reintento ${currentRetry}/${maxRetries} después de ${backoffDelay/1000} segundos debido a: ${lastError.message}`);
+            await new Promise(resolve => setTimeout(resolve, backoffDelay));
+          }
+          
+          // Intentar generar la síntesis
+          console.log(`Generando síntesis (intento ${currentRetry + 1}/${maxRetries + 1})...`);
+          synthesis = await claudeService.generateSynthesis(clinicalQuestion, articles);
+          
+          // Si llegamos aquí, fue exitoso
+          console.log('Síntesis generada correctamente');
+          break;
+        } catch (error) {
+          lastError = error;
+          
+          // Solo reintentar en caso de timeout o problemas temporales
+          if (error.message && (
+              error.message.includes('tiempo de espera agotado') ||
+              error.message.includes('timeout') ||
+              error.message.includes('rate limit') ||
+              error.message.includes('503') ||
+              error.message.includes('servicio no disponible')
+          )) {
+            console.warn(`Error temporal en la generación de síntesis: ${error.message}`);
+            currentRetry++;
+          } else {
+            // Para otros errores, no reintentar
+            console.error(`Error no recuperable en la generación de síntesis: ${error.message}`);
+            throw error;
+          }
+        }
+      }
+      
+      // Si después de todos los reintentos no tenemos síntesis, lanzar el último error
+      if (!synthesis) {
+        throw lastError || new Error('No se pudo generar la síntesis después de múltiples intentos');
+      }
       
       return res.status(200).json({
         success: true,

@@ -138,7 +138,15 @@
 <a name='L73'></a><a href='#L73'>73</a>
 <a name='L74'></a><a href='#L74'>74</a>
 <a name='L75'></a><a href='#L75'>75</a>
-<a name='L76'></a><a href='#L76'>76</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -175,6 +183,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -243,51 +259,59 @@ Título: ${title}
 Autores: ${authors}
 Fecha: ${publicationDate}
 PMID: ${pmid}
-Abstract: ${abstract.substring(0, 300)}${abstract.length &gt; 300 ? '...' : ''}
-Análisis previo: ${analysis.substring(0, 500)}${analysis.length &gt; 500 ? '...' : ''}
+Abstract: ${abstract.substring(0, 200)}${abstract.length &gt; 200 ? '...' : ''}
+Análisis previo: ${analysis.substring(0, 300)}${analysis.length &gt; 300 ? '...' : ''}
     `;
   }).join('\n\n');
   
-  // Crear un prompt para la síntesis
-<span class="cstat-no" title="statement not covered" >  return `Eres Claude, un asistente experto en medicina basada en la evidencia y análisis crítico de literatura científica. </span>
-&nbsp;
-Tu tarea es crear una síntesis crítica de la evidencia científica para responder a la siguiente pregunta clínica:
+  // Crear un prompt para la síntesis optimizado para ser más eficiente
+<span class="cstat-no" title="statement not covered" >  return `Eres un experto en medicina basada en evidencia y meta-análisis. Crea una síntesis de la evidencia científica con enfoque meta-analítico para responder:</span>
 &nbsp;
 PREGUNTA CLÍNICA: "${clinicalQuestion}"
 &nbsp;
-He analizado previamente varios artículos científicos relacionados con esta pregunta. A continuación te proporciono la información extraída de estos artículos, incluyendo títulos, autores, fechas, abstracts y un análisis previo de cada uno:
-&nbsp;
+INFORMACIÓN DE ARTÍCULOS:
 ${articlesInfo}
 &nbsp;
-INSTRUCCIONES PARA LA SÍNTESIS:
+INSTRUCCIONES PARA META-ANÁLISIS (FORMATO CONCISO):
 &nbsp;
-1. INTRODUCCIÓN:
-   - Presenta brevemente la pregunta clínica y su relevancia
-   - Menciona el número de artículos revisados y sus características generales (tipos de estudios, fechas, poblaciones)
-   
-2. CUERPO PRINCIPAL:
-   - Organiza la evidencia por temas o hallazgos principales, no por artículo individual
-   - Contrasta los resultados cuando haya discrepancias entre estudios
-   - Destaca los acuerdos y desacuerdos entre autores
-   - Evalúa críticamente la calidad metodológica de los estudios
-   - Presenta los hallazgos de mayor a menor nivel de evidencia
-   - Identifica posibles sesgos o limitaciones en el conjunto de la evidencia
-   - Cita los artículos usando el formato (Autor principal et al., año)
-   
-3. CONCLUSIÓN:
-   - Resume la respuesta a la pregunta clínica según la evidencia analizada
-   - Indica el nivel de certeza/incertidumbre en las conclusiones
-   - Menciona las limitaciones de la evidencia disponible
-   - Sugiere áreas para investigación futura si es pertinente
-   
-4. FORMATO Y ESTILO:
-   - Utiliza un lenguaje científico pero accesible
-   - Estructura el texto con encabezados y párrafos claros
-   - Incluye formato HTML para mejorar la legibilidad (títulos &lt;h4&gt;, párrafos &lt;p&gt;, etc.)
-   - Crea una síntesis científica rigurosa pero concisa (aproximadamente 1000-1500 palabras)
-   - Usa un tono académico pero directo
-   
-Genera una síntesis crítica completa en formato HTML, que evalúe objetivamente la evidencia disponible para responder a la pregunta clínica planteada.`;
+1. HETEROGENEIDAD:
+   - Calcula e interpreta I² (&lt;25% baja, 25-50% moderada, &gt;50% alta)
+   - Reporta Q de Cochran (con valor p)
+   - Determina si es adecuado un meta-análisis
+&nbsp;
+2. SÍNTESIS CUANTITATIVA:
+   - Usa modelo de efectos aleatorios si hay heterogeneidad moderada/alta
+   - Proporciona efectos combinados con IC 95%
+   - Incluye pesos por estudio
+   - Presenta datos para forest plot
+&nbsp;
+3. ANÁLISIS CUALITATIVO:
+   - Organiza por temas, no por artículo
+   - Evalúa con metodología GRADE
+   - Cita con formato (Autor et al., año)
+&nbsp;
+4. FORMATO HTML:
+   - Usa este formato para heterogeneidad:
+     &lt;div class="heterogeneity-stats"&gt;
+       &lt;div class="heterogeneity-stat"&gt;
+         &lt;span class="stat-name"&gt;I²&lt;/span&gt;
+         &lt;span class="stat-value"&gt;42%&lt;/span&gt;
+         &lt;span class="stat-interpretation"&gt;Heterogeneidad moderada&lt;/span&gt;
+       &lt;/div&gt;
+       &lt;div class="heterogeneity-stat"&gt;
+         &lt;span class="stat-name"&gt;Q de Cochran&lt;/span&gt;
+         &lt;span class="stat-value"&gt;15.3 (p=0.084)&lt;/span&gt;
+       &lt;/div&gt;
+     &lt;/div&gt;
+&nbsp;
+   - Usa este formato para la tabla meta-analítica:
+     &lt;table class="meta-table"&gt;
+       &lt;tr&gt;&lt;th&gt;Estudio&lt;/th&gt;&lt;th&gt;Año&lt;/th&gt;&lt;th&gt;OR [IC 95%]&lt;/th&gt;&lt;th&gt;Peso&lt;/th&gt;&lt;/tr&gt;
+       &lt;tr&gt;&lt;td&gt;Smith et al.&lt;/td&gt;&lt;td&gt;2023&lt;/td&gt;&lt;td class="ci-value"&gt;1.75 [1.32-2.31]&lt;/td&gt;&lt;td class="weight"&gt;45%&lt;/td&gt;&lt;/tr&gt;
+       &lt;tr class="combined-effect"&gt;&lt;td colspan="2"&gt;Efecto combinado&lt;/td&gt;&lt;td class="ci-value"&gt;1.82 [1.45-2.28]&lt;/td&gt;&lt;td class="weight"&gt;100%&lt;/td&gt;&lt;/tr&gt;
+     &lt;/table&gt;
+&nbsp;
+Genera una síntesis HTML concisa (max. 1500 palabras) con estadísticas de heterogeneidad, tabla meta-analítica y conclusiones basadas en GRADE.`;
 } </pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -295,7 +319,7 @@ Genera una síntesis crítica completa en formato HTML, que evalúe objetivament
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-04-29T03:11:49.503Z
+                at 2025-04-30T02:03:09.342Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

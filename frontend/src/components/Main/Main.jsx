@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import SearchBar from "../SearchBar";
 import ToggleSwitch from "../ToggleSwitch";
-import Card from "../Card";
+import Card from "../Card/Card";
 import DiagnosisPanel from "../DiagnosisPanel";
 import Spinner from "../Spinner";
 import aiService from "../../services/aiService";
@@ -29,6 +29,25 @@ const logError = (message, error) => {
       console.error('Status:', error.response.status);
     }
   }
+};
+
+// Nuevo componente BatchProgressBar
+const BatchProgressBar = ({ progress }) => {
+  if (!progress.processing) return null;
+  
+  return (
+    <div className="batch-progress-container">
+      <div className="batch-progress-bar">
+        <div 
+          className="batch-progress-fill" 
+          style={{ width: `${(progress.current / progress.total) * 100}%` }}
+        ></div>
+      </div>
+      <p className="batch-progress-text">
+        Analizando artículos: {progress.current} de {progress.total}
+      </p>
+    </div>
+  );
 };
 
 const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
@@ -504,34 +523,6 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       "<strong>Preparando análisis de evidencia científica</strong><br>Estamos organizando los datos de los artículos para un análisis exhaustivo."
     );
     
-    // Actualizar el spinner global para mayor visibilidad
-    const globalSpinnerContainer = document.getElementById('global-spinner-container');
-    const globalSpinnerText = document.querySelector('.global-spinner-text');
-    
-    if (globalSpinnerContainer && globalSpinnerText) {
-      globalSpinnerContainer.style.display = 'flex';
-      globalSpinnerText.textContent = "Analizando evidencia científica...";
-      
-      // Mensajes rotativos para el proceso de síntesis
-      const synthesisMessages = [
-        "Analizando metodología y calidad de los estudios...",
-        "Evaluando nivel de evidencia de cada artículo...",
-        "Contrastando hallazgos entre los diferentes estudios...",
-        "Organizando conclusiones en base a la mejor evidencia disponible...",
-        "Generando una síntesis rigurosa para tu pregunta clínica...",
-        "Este proceso puede tardar hasta un minuto, pero el resultado valdrá la pena..."
-      ];
-      
-      let messageIndex = 0;
-      const messageInterval = setInterval(() => {
-        messageIndex = (messageIndex + 1) % synthesisMessages.length;
-        globalSpinnerText.textContent = synthesisMessages[messageIndex];
-      }, 10000);
-      
-      // Guardar el ID del intervalo para limpiarlo más tarde
-      window.synthesiSpinnerIntervalId = messageInterval;
-    }
-
     try {
       // Avanzar al primer paso después de 1 segundo para simular progreso
       setTimeout(() => {
@@ -584,7 +575,7 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       // Guardar el resultado
       setSynthesisContent(processedContent);
       
-      // Cerrar alerta de proceso y mostrar confirmación
+      // Cerrar alerta de proceso
       notificationService.closeNotification(synthesisAlert);
 
     } catch (error) {
@@ -596,19 +587,11 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
         "Error en síntesis", 
         `No se pudo generar la síntesis: ${error.message}`
       );
+      
+      // Cerrar el modal de síntesis en caso de error
+      setShowSynthesisModal(false);
     } finally {
       setSynthesisLoading(false);
-      
-      // Ocultar spinner global
-      if (globalSpinnerContainer) {
-        globalSpinnerContainer.style.display = 'none';
-      }
-      
-      // Limpiar intervalo de mensajes
-      if (window.synthesiSpinnerIntervalId) {
-        clearInterval(window.synthesiSpinnerIntervalId);
-        window.synthesiSpinnerIntervalId = null;
-      }
     }
   };
 
@@ -853,44 +836,13 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
             </div>
             <div className="synthesis-modal-body">
               {synthesisLoading ? (
-                <div className="synthesis-loading">
-                  <Spinner />
-                  <p className="synthesis-loading-title">Sintetizando evidencia científica...</p>
-                  <div className="synthesis-loading-phases">
-                    <div className="synthesis-loading-phase">
-                      <div className="phase-icon">📄</div>
-                      <div className="phase-content">
-                        <div className="phase-title">Extracción de datos</div>
-                        <div className="phase-description">Organizando hallazgos de los estudios</div>
-                      </div>
-                    </div>
-                    <div className="synthesis-loading-phase">
-                      <div className="phase-icon">🔍</div>
-                      <div className="phase-content">
-                        <div className="phase-title">Análisis crítico</div>
-                        <div className="phase-description">Evaluando calidad metodológica</div>
-                      </div>
-                    </div>
-                    <div className="synthesis-loading-phase">
-                      <div className="phase-icon">🧩</div>
-                      <div className="phase-content">
-                        <div className="phase-title">Síntesis temática</div>
-                        <div className="phase-description">Integrando resultados similares</div>
-                      </div>
-                    </div>
-                    <div className="synthesis-loading-phase">
-                      <div className="phase-icon">⚖️</div>
-                      <div className="phase-content">
-                        <div className="phase-title">Ponderación de evidencia</div>
-                        <div className="phase-description">Considerando el nivel de cada estudio</div>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="synthesis-loading-message spinner-text-animated">Este proceso puede tomar hasta un minuto. Gracias por tu paciencia mientras elaboramos una síntesis rigurosa.</p>
-                </div>
+                null // No mostrar nada adicional durante la carga, ya que hay una alerta externa con los pasos
               ) : (
                 <div className="synthesis-content">
-                  <h3>Respuesta a la pregunta: {searchQuery}</h3>
+                  <h3>
+                    <span style={{ fontWeight: "600", color: "#6c47d5" }}>Pregunta clínica:</span> 
+                    {searchQuery}
+                  </h3>
                   
                   {/* Descargo de responsabilidad médica */}
                   <div className="synthesis-disclaimer">
@@ -901,12 +853,25 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
                     </div>
                   </div>
                   
+                  <div className="synthesis-meta-banner">
+                    <div className="meta-icon">📊</div>
+                    <div className="meta-content">
+                      <div className="meta-title">Análisis Meta-analítico</div>
+                      <div className="meta-description">Esta síntesis incluye evaluación de heterogeneidad, forest plots y otras métricas cuantitativas.</div>
+                    </div>
+                  </div>
+                  
                   <div className="synthesis-text">
                     {synthesisContent ? (
                       <div dangerouslySetInnerHTML={{ __html: synthesisContent }} />
                     ) : (
                       <p>No hay contenido disponible</p>
                     )}
+                  </div>
+                  
+                  {/* Sección de visualizaciones */}
+                  <div className="forest-plot-container">
+                    {/* El forest plot se generará dinámicamente con los datos de la síntesis */}
                   </div>
                   
                   {/* Sección de referencias (oculta por defecto) */}
@@ -1042,19 +1007,27 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
               <div className="results-info">
                 <h3>Resultados para: {searchResults.query}</h3>
                 <p>Modo de búsqueda: {searchResults.iaEnabled ? "Con IA" : "Tradicional"}</p>
+                <p>Se encontraron <strong>{searchResults.count}</strong> artículos relevantes</p>
+                
+                {/* Botón de síntesis con IA integrado en la card */}
+                {articles.length > 0 && iaEnabled && (
+                  <div className="synthesis-button-container">
+                    <button 
+                      className={`synthesis-button ${synthesisLoading ? 'synthesis-button-loading' : ''}`}
+                      onClick={generateSynthesis}
+                      disabled={synthesisLoading}
+                      title="Generar síntesis de evidencia científica"
+                    >
+                      <span className="synthesis-icon">
+                        {synthesisLoading ? '✨' : '🔬'}
+                      </span>
+                      <span className="synthesis-text">
+                        {synthesisLoading ? 'Generando meta-análisis...' : 'Sintetizar evidencia científica'}
+                      </span>
+                    </button>
+                  </div>
+                )}
               </div>
-              
-              {/* Botón de síntesis con IA */}
-              {articles.length > 0 && iaEnabled && (
-                <button 
-                  className="synthesis-button"
-                  onClick={generateSynthesis}
-                  disabled={synthesisLoading}
-                >
-                  <span className="synthesis-icon">⚡</span>
-                  <span className="synthesis-text">Síntesis con IA</span>
-                </button>
-              )}
             </div>
             
             {searchStrategy && (
@@ -1089,19 +1062,8 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
           </div>
         )}
 
-        {batchProgress.processing && (
-          <div className="batch-progress-container">
-            <div className="batch-progress-bar">
-              <div 
-                className="batch-progress-fill" 
-                style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
-              ></div>
-            </div>
-            <p className="batch-progress-text">
-              Analizando artículos: {batchProgress.current} de {batchProgress.total}
-            </p>
-          </div>
-        )}
+        {/* Reemplazamos el código de barra de progreso con el nuevo componente */}
+        <BatchProgressBar progress={batchProgress} />
       </div>
     </main>
   );

@@ -52,7 +52,58 @@ export const claudeServiceMock = {
         analyzed: true
       }));
     }),
-  generateSynthesis: jest.fn().mockResolvedValue('Síntesis de la evidencia científica'),
+  generateSynthesis: jest.fn().mockResolvedValue(`
+    <div class="synthesis-content">
+      <h4>Síntesis de Evidencia: Meta-análisis</h4>
+      
+      <div class="heterogeneity-stats">
+        <div class="heterogeneity-stat">
+          <span class="stat-name">I²</span>
+          <span class="stat-value">42%</span>
+          <span class="stat-interpretation">Heterogeneidad moderada</span>
+        </div>
+        <div class="heterogeneity-stat">
+          <span class="stat-name">Q de Cochran</span>
+          <span class="stat-value">15.3 (p=0.084)</span>
+        </div>
+        <div class="heterogeneity-stat">
+          <span class="stat-name">OR combinado</span>
+          <span class="stat-value">1.82 [1.45-2.28]</span>
+        </div>
+      </div>
+      
+      <p>La revisión de la evidencia disponible sugiere conclusiones relevantes para la pregunta clínica planteada. El análisis estadístico indica un efecto significativo con heterogeneidad moderada entre estudios.</p>
+      
+      <table class="meta-table">
+        <tr>
+          <th>Estudio</th>
+          <th>Año</th>
+          <th>OR [IC 95%]</th>
+          <th>Peso</th>
+        </tr>
+        <tr>
+          <td>Smith et al.</td>
+          <td>2023</td>
+          <td class="ci-value">1.75 [1.32-2.31]</td>
+          <td class="weight">45%</td>
+        </tr>
+        <tr>
+          <td>Brown et al.</td>
+          <td>2022</td>
+          <td class="ci-value">1.92 [1.38-2.67]</td>
+          <td class="weight">55%</td>
+        </tr>
+        <tr class="combined-effect">
+          <td colspan="2">Efecto combinado</td>
+          <td class="ci-value">1.82 [1.45-2.28]</td>
+          <td class="weight">100%</td>
+        </tr>
+      </table>
+      
+      <h4>Conclusiones</h4>
+      <p>La evidencia científica analizada apoya que existe un efecto estadísticamente significativo. La calidad de la evidencia según GRADE es moderada.</p>
+    </div>
+  `),
   // Métodos específicos para probar el manejo de rate limit
   handleRateLimit: jest.fn().mockImplementation(async (error, retryFn) => {
     // Simula el manejo de rate limit con reintento
