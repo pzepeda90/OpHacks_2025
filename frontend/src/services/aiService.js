@@ -20,6 +20,45 @@ const logError = (method, message, error) => {
   }
 };
 
+// Función auxiliar para manejar errores de API con reintentos
+const handleApiError = async (error, functionName, retryCount = 0, maxRetries = 3) => {
+  const errorMessage = error?.response?.data?.message || error.message;
+  console.error(`[CLAUDE ERROR ${new Date().toISOString()}] [${functionName}] Error en intento ${retryCount + 1}: ${errorMessage}`);
+  
+  // Verificar si es un error de rate limit (429)
+  const isRateLimit = error?.response?.status === 429;
+  
+  // Si es un error de rate limit y aún no hemos alcanzado el máximo de reintentos
+  if (isRateLimit && retryCount < maxRetries) {
+    // Obtener tiempo recomendado de espera o usar backoff exponencial
+    let backoffTime = 0;
+    
+    // Intentar obtener el tiempo de espera recomendado por la API
+    if (error.response && error.response.headers && error.response.headers['retry-after']) {
+      const retryAfter = parseInt(error.response.headers['retry-after'], 10);
+      if (!isNaN(retryAfter)) {
+        backoffTime = retryAfter * 1000; // Convertir a milisegundos
+      }
+    }
+    
+    // Si no hay un tiempo recomendado, usar backoff exponencial
+    if (!backoffTime) {
+      // Tiempo base de 2 segundos con factor exponencial y jitter aleatorio
+      const baseDelay = 2000;
+      backoffTime = baseDelay * Math.pow(2, retryCount) + Math.random() * 1000;
+    }
+    
+    console.log(`[CLAUDE RETRY ${new Date().toISOString()}] [${functionName}] Reintentando en ${backoffTime/1000} segundos (intento ${retryCount + 1}/${maxRetries})`);
+    
+    // Esperar antes de reintentar
+    return new Promise(resolve => setTimeout(resolve, backoffTime))
+      .then(() => true); // Indicar que debemos reintentar
+  }
+  
+  // Si no es rate limit o ya agotamos los reintentos, propagar el error
+  throw new Error(`Error en el servicio de IA: ${errorMessage}`);
+};
+
 /**
  * Servicio para interactuar con la API de Claude
  */

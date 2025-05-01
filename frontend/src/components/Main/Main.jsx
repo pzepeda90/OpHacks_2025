@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import SearchBar from "../SearchBar";
-import ToggleSwitch from "../ToggleSwitch";
 import Card from "../Card/Card";
 import DiagnosisPanel from "../DiagnosisPanel";
 import Spinner from "../Spinner";
@@ -197,29 +196,33 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
     setApiResponse(null);
     setError(null);
     
-    // Definir los pasos del proceso
+    // Definir los pasos del proceso con tiempos estimados
     const searchSteps = [
       {
         title: "Formulando pregunta clínica",
-        description: "Analizando la estructura y elementos clave de su consulta"
+        description: "Analizando la estructura y elementos clave de su consulta",
+        estimatedTime: 3
       },
       {
         title: "Generando estrategia de búsqueda",
-        description: "Utilizando IA para optimizar términos y operadores booleanos"
+        description: "Utilizando IA para optimizar términos y operadores booleanos",
+        estimatedTime: 10
       },
       {
         title: "Buscando artículos relacionados",
-        description: "Consultando base de datos PubMed y otros recursos médicos"
+        description: "Consultando base de datos PubMed y otros recursos médicos",
+        estimatedTime: 45
       },
       {
         title: "Analizando resultados",
-        description: "Evaluando relevancia y calidad de la evidencia encontrada"
+        description: "Evaluando relevancia y calidad de la evidencia encontrada",
+        estimatedTime: 30
       }
     ];
     
-    // Mostrar la notificación de proceso
-    const processAlert = notificationService.showProcessSteps(searchSteps, 0);
-    logInfo("Notificación de proceso iniciada", { steps: searchSteps });
+    // Mostrar la notificación de proceso - ahora devuelve un ID
+    let processAlertId = notificationService.showProcessSteps(searchSteps, 0);
+    logInfo("Notificación de proceso iniciada", { steps: searchSteps, alertId: processAlertId });
     
     // Mostrar el spinner global durante la búsqueda
     document.getElementById('global-spinner-container').style.display = 'flex';
@@ -232,7 +235,7 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       // PASO 1: Formulando pregunta clínica
       logInfo("PASO 1: Formulando pregunta clínica");
       await new Promise(resolve => setTimeout(resolve, 1000));
-      notificationService.updateProcessStep(processAlert, searchSteps, 1);
+      processAlertId = notificationService.updateProcessStep(processAlertId, searchSteps, 1);
       logInfo("Paso 1 completado");
       
       // PASO 2: Si IA está habilitada, generamos estrategia de búsqueda con IA
@@ -274,7 +277,7 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
             title: "Error en IA",
             message: `No se pudo generar la estrategia de búsqueda: ${error.message}`,
           });
-          notificationService.closeNotification(processAlert);
+          notificationService.closeNotification(processAlertId);
           notificationService.showError("Error en IA", `No se pudo generar la estrategia de búsqueda: ${error.message}`);
           setLoading(false);
           return;
@@ -287,11 +290,11 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       logInfo("PASO 3: Buscando artículos en PubMed");
       
       // Actualizar mensaje de progreso para este paso que toma más tiempo
-      notificationService.updateProcessStep(
-        processAlert, 
+      processAlertId = notificationService.updateProcessStep(
+        processAlertId, 
         searchSteps, 
         2, 
-        "<strong>Consultando bases de datos científicas...</strong><br>Este proceso puede demorar hasta 60 segundos mientras recuperamos los artículos más relevantes para tu consulta."
+        `<strong>Consultando bases de datos científicas...</strong><br>Este proceso puede demorar hasta 60 segundos mientras recuperamos los artículos más relevantes para tu consulta.<br><span class="time-estimate">Tiempo estimado: ${searchSteps[2].estimatedTime} segundos</span>`
       );
       
       // Actualizar el texto del spinner global
@@ -360,11 +363,11 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
             const realArticles = pubmedResults.results;
             
             if (iaEnabled) {
-              notificationService.updateProcessStep(
-                processAlert, 
+              processAlertId = notificationService.updateProcessStep(
+                processAlertId, 
                 searchSteps, 
                 3, 
-                "<strong>Analizando artículos científicos...</strong><br>Estamos evaluando la metodología y conclusiones de cada estudio para ofrecerte el mejor análisis posible."
+                `<strong>Analizando artículos científicos...</strong><br>Estamos evaluando la metodología y conclusiones de cada estudio para ofrecerte el mejor análisis posible.<br><span class="time-estimate">Tiempo estimado: ${searchSteps[3].estimatedTime} segundos</span>`
               );
               
               // Actualizar el texto del spinner global
@@ -429,8 +432,8 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
             });
             logInfo("Búsqueda guardada en historial");
             
-            // Cerrar notificación de proceso, pero no mostrar notificación de éxito que cause duplicados
-            notificationService.closeNotification(processAlert);
+            // Cerrar notificación de proceso de manera definitiva
+            notificationService.closeNotification(processAlertId);
             
             setLoading(false);
             return;
@@ -441,7 +444,7 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
         logInfo("No se encontraron artículos en PubMed o formato de respuesta inválido");
         
         // Mostrar notificación de no resultados
-        notificationService.closeNotification(processAlert);
+        notificationService.closeNotification(processAlertId);
         notificationService.showInfo(
           "Sin resultados", 
           "No se encontraron artículos que coincidan con su consulta. Intente con términos más generales."
@@ -451,7 +454,7 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
         return;
       } catch (apiError) {
         logError("Error en la búsqueda en PubMed", apiError);
-        notificationService.closeNotification(processAlert);
+        notificationService.closeNotification(processAlertId);
         notificationService.showError(
           "Error en la búsqueda", 
           `No se pudieron obtener resultados: ${apiError.message}`
@@ -462,7 +465,7 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       
     } catch (error) {
       logError("Error general en el proceso de búsqueda", error);
-      notificationService.closeNotification(processAlert);
+      notificationService.closeNotification(processAlertId);
       notificationService.showError(
         "Error en la búsqueda", 
         "No se pudieron obtener resultados para su consulta. Por favor, inténtelo de nuevo."
@@ -492,41 +495,78 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       clinicalQuestion: searchQuery
     });
     
+    // Calcular tiempos estimados basados en la cantidad de artículos
+    const articleCount = articles.length;
+    // Tiempos estimados en segundos para cada fase (basados en logs analizados)
+    const timeEstimates = {
+      preparacion: 2 + (articleCount * 0.5),  // Tiempo base + tiempo por artículo
+      analisis: 5 + (articleCount * 3),       // Análisis inicial de artículos
+      sintesis: 15 + (articleCount * 2),      // Sintetizar los hallazgos
+      conclusion: 20 + (articleCount * 1.5)   // Generar conclusiones
+    };
+    
+    // Tiempo total estimado en segundos
+    const totalEstimatedTime = Object.values(timeEstimates).reduce((sum, time) => sum + time, 0);
+    // Convertir a formato minutos:segundos
+    const estimatedMinutes = Math.floor(totalEstimatedTime / 60);
+    const estimatedSeconds = Math.floor(totalEstimatedTime % 60);
+    const timeFormatted = `${estimatedMinutes}:${estimatedSeconds.toString().padStart(2, '0')}`;
+    
+    logInfo("Tiempo estimado para síntesis", { 
+      totalSeconds: totalEstimatedTime,
+      formattedTime: timeFormatted,
+      articleCount,
+      timeEstimates
+    });
+    
     setSynthesisLoading(true);
-    setShowSynthesisModal(true);
     setShowReferences(false);
 
-    // Definir los pasos del proceso de síntesis
+    // Definir los pasos del proceso de síntesis con tiempos estimados
     const synthesisSteps = [
       {
         title: "Analizando artículos científicos",
-        description: "Extrayendo información relevante de los estudios seleccionados"
+        description: "Extrayendo información relevante de los estudios seleccionados",
+        estimatedTime: timeEstimates.preparacion
       },
       {
         title: "Evaluando calidad metodológica",
-        description: "Valorando el nivel de evidencia y posibles sesgos de cada artículo"
+        description: "Valorando el nivel de evidencia y posibles sesgos de cada artículo",
+        estimatedTime: timeEstimates.analisis
       },
       {
         title: "Sintetizando hallazgos",
-        description: "Organizando la evidencia según temas y relevancia clínica"
+        description: "Organizando la evidencia según temas y relevancia clínica",
+        estimatedTime: timeEstimates.sintesis
       },
       {
         title: "Generando conclusiones",
-        description: "Integrando toda la evidencia para responder a tu pregunta clínica"
+        description: "Integrando toda la evidencia para responder a tu pregunta clínica",
+        estimatedTime: timeEstimates.conclusion
       }
     ];
     
-    // Mostrar notificación de proceso de síntesis con pasos
-    const synthesisAlert = notificationService.showProcessSteps(
+    // Mostrar notificación de proceso de síntesis con pasos y tiempo total estimado - ahora devuelve un ID
+    let synthesisAlertId = notificationService.showProcessSteps(
       synthesisSteps, 
       0, 
-      "<strong>Preparando análisis de evidencia científica</strong><br>Estamos organizando los datos de los artículos para un análisis exhaustivo."
+      `<strong>Preparando análisis de evidencia científica</strong><br>Estamos organizando los datos de los ${articleCount} artículos para un análisis exhaustivo.<br><span class="time-total-estimate">Tiempo total estimado: ${timeFormatted} minutos</span>`
     );
+
+    // --- NUEVO: Guardar los IDs de los timeouts para poder cancelarlos ---
+    let timeoutStep1 = null;
+    let timeoutStep2 = null;
+    let timeoutStep3 = null;
     
     try {
       // Avanzar al primer paso después de 1 segundo para simular progreso
-      setTimeout(() => {
-        notificationService.updateProcessStep(synthesisAlert, synthesisSteps, 1);
+      timeoutStep1 = setTimeout(() => {
+        synthesisAlertId = notificationService.updateProcessStep(
+          synthesisAlertId, 
+          synthesisSteps, 
+          1,
+          `<strong>Evaluando calidad metodológica</strong><br>Analizando la evidencia científica de los ${articleCount} artículos.<br><span class="time-estimate">Tiempo estimado: ${Math.ceil(timeEstimates.analisis)} segundos</span>`
+        );
       }, 1000);
 
       // Preparar datos para la síntesis
@@ -541,13 +581,13 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
 
       logInfo("Datos de artículos preparados para síntesis", { count: articlesData.length });
 
-      // Avanzar al segundo paso después de 2 segundos
-      setTimeout(() => {
-        notificationService.updateProcessStep(
-          synthesisAlert, 
+      // Avanzar al segundo paso después de 8 segundos
+      timeoutStep2 = setTimeout(() => {
+        synthesisAlertId = notificationService.updateProcessStep(
+          synthesisAlertId, 
           synthesisSteps, 
           2,
-          "<strong>Sintetizando hallazgos científicos</strong><br>Organizando la información por temas y relevancia clínica."
+          `<strong>Sintetizando hallazgos científicos</strong><br>Organizando la información por temas y relevancia clínica.<br><span class="time-estimate">Tiempo estimado: ${Math.ceil(timeEstimates.sintesis)} segundos</span>`
         );
       }, 8000);
 
@@ -555,19 +595,31 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       let evidenceScore = calculateEvidenceRating(articles);
       setEvidenceRating(evidenceScore);
       
-      // Avanzar al tercer paso después de otros 3 segundos
-      setTimeout(() => {
-        notificationService.updateProcessStep(
-          synthesisAlert, 
+      // Avanzar al tercer paso después de otros 16 segundos
+      timeoutStep3 = setTimeout(() => {
+        synthesisAlertId = notificationService.updateProcessStep(
+          synthesisAlertId, 
           synthesisSteps, 
           3,
-          "<strong>Generando conclusiones</strong><br>Este es el paso final que puede tomar hasta 30 segundos."
+          `<strong>Generando conclusiones</strong><br>Este es el paso final que integra todos los hallazgos.<br><span class="time-estimate">Tiempo estimado: ${Math.ceil(timeEstimates.conclusion)} segundos</span>`
         );
       }, 16000);
       
+      // Iniciar tiempo para medir duración real
+      const startTime = Date.now();
+      
       // Llamar al servicio para generar la síntesis
       const result = await aiService.generateSynthesis(searchQuery, articlesData);
-      logInfo("Síntesis generada exitosamente");
+      
+      // Calcular tiempo real que tomó
+      const endTime = Date.now();
+      const actualTimeSeconds = Math.round((endTime - startTime) / 1000);
+      
+      logInfo("Síntesis generada exitosamente", {
+        estimatedTime: totalEstimatedTime,
+        actualTime: actualTimeSeconds,
+        difference: actualTimeSeconds - totalEstimatedTime
+      });
       
       // Procesar contenido para agregar interactividad a las citas
       const processedContent = processCitationReferences(result, articles);
@@ -575,19 +627,32 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
       // Guardar el resultado
       setSynthesisContent(processedContent);
       
-      // Cerrar alerta de proceso
-      notificationService.closeNotification(synthesisAlert);
+      // --- NUEVO: Cancelar los timeouts antes de cerrar la alerta y mostrar el modal ---
+      clearTimeout(timeoutStep1);
+      clearTimeout(timeoutStep2);
+      clearTimeout(timeoutStep3);
+      
+      // Cerrar alerta de proceso de manera definitiva y esperar un poco para asegurar que se cierre por completo
+      notificationService.closeNotification(synthesisAlertId);
+      
+      // Pequeña pausa para asegurar que SweetAlert2 se cierre completamente antes de mostrar el modal
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Mostrar el modal DESPUÉS de que la síntesis se ha generado correctamente
+      setShowSynthesisModal(true);
 
     } catch (error) {
       logError("Error al generar síntesis", error);
-      
+      // --- NUEVO: Cancelar los timeouts también en caso de error ---
+      clearTimeout(timeoutStep1);
+      clearTimeout(timeoutStep2);
+      clearTimeout(timeoutStep3);
       // Cerrar alerta de proceso y mostrar error
-      notificationService.closeNotification(synthesisAlert);
+      notificationService.closeNotification(synthesisAlertId);
       notificationService.showError(
         "Error en síntesis", 
         `No se pudo generar la síntesis: ${error.message}`
       );
-      
       // Cerrar el modal de síntesis en caso de error
       setShowSynthesisModal(false);
     } finally {
@@ -806,6 +871,32 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
     logInfo(`Asistencia IA ${checked ? 'activada' : 'desactivada'}`);
   };
 
+  useEffect(() => {
+    // Asignar color automáticamente a los badges de heterogeneidad
+    if (showSynthesisModal && synthesisContent) {
+      setTimeout(() => {
+        const stats = document.querySelectorAll('.heterogeneity-stat .stat-value');
+        stats.forEach((el) => {
+          const text = el.textContent.trim();
+          // Buscar porcentaje (I²)
+          const percentMatch = text.match(/(\d{1,3})%/);
+          if (percentMatch) {
+            const value = parseInt(percentMatch[1], 10);
+            el.classList.remove('badge-bueno', 'badge-regular', 'badge-malo');
+            if (value < 25) {
+              el.classList.add('badge-bueno');
+            } else if (value < 50) {
+              el.classList.add('badge-regular');
+            } else {
+              el.classList.add('badge-malo');
+            }
+          }
+          // Puedes agregar más lógica para otros tipos de stats si lo deseas
+        });
+      }, 100);
+    }
+  }, [showSynthesisModal, synthesisContent]);
+
   return (
     <main className="main-container">
       {/* Spinner global para mostrar durante el proceso */}
@@ -813,7 +904,6 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
         <Spinner />
         <p className="global-spinner-text spinner-text-animated">Procesando su consulta...</p>
       </div>
-      
       {/* Modal de síntesis que se muestra cuando showSynthesisModal es true */}
       {showSynthesisModal && (
         <div className="synthesis-modal-overlay">
@@ -880,15 +970,17 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
                     <ol className="references-list">
                       {articles.map((article) => (
                         <li key={article.pmid}>
-                          {article.authors && 
-                            `${article.authors}. `}
-                          <strong>{article.title}</strong> 
-                          {article.source && 
-                            ` ${article.source}.`}
-                          {article.publicationDate && 
-                            ` ${article.publicationDate}.`}
-                          {article.pmid && 
-                            ` PMID: ${article.pmid}`}
+                          {article.authors &&
+                            `${Array.isArray(article.authors)
+                              ? article.authors.map(a => (typeof a === 'string' ? a : (a.name || a.lastName || a.firstName || '')).trim()).filter(Boolean).join(', ')
+                              : (typeof article.authors === 'object' && article.authors !== null
+                                  ? (article.authors.name || article.authors.lastName || article.authors.firstName || '').trim()
+                                  : article.authors)
+                            }. `}
+                          <strong>{article.title}</strong>
+                          {article.source && ` ${article.source}.`}
+                          {article.publicationDate && ` ${article.publicationDate}.`}
+                          {article.pmid && ` PMID: ${article.pmid}`}
                         </li>
                       ))}
                     </ol>
@@ -965,18 +1057,6 @@ const Main = ({ onSearch, onToggleIA, iaEnabled }) => {
             onChange={handleInputChange}
             onSubmit={handleSearch}
           />
-          
-          <div className="toggle-container">
-            <ToggleSwitch 
-              checked={iaEnabled}
-              onChange={handleToggle}
-              id="ia-toggle"
-              label="Asistencia con IA"
-            />
-            <span className="toggle-description">
-              {iaEnabled ? "IA habilitada para resultados mejorados" : "Búsqueda tradicional"}
-            </span>
-          </div>
         </div>
 
         {/* Reemplazamos el panel de debug anterior con DiagnosisPanel */}

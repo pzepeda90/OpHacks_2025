@@ -1127,7 +1127,6 @@ Pregunta clínica: ${clinicalQuestion}`;
               <div class="pico-title" style="font-weight: 600; margin-bottom: 5px; color: #333;">${component.title}</div>
               <div class="pico-description" style="font-size: 14px; color: #555;">${details.description}</div>
             </div>
-            <div class="relevance-badge relevance-${details.relevance}" style="position: absolute; top: 10px; right: 10px; width: 25px; height: 25px; border-radius: 50%; background-color: ${details.relevance >= 4 ? '#4566e0' : details.relevance >= 3 ? '#6c47d5' : details.relevance >= 2 ? '#e67e22' : '#e74c3c'}; color: white; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold;">${details.relevance}</div>
           </li>
         `;
       } else {
@@ -1139,7 +1138,6 @@ Pregunta clínica: ${clinicalQuestion}`;
               <div class="pico-title" style="font-weight: 600; margin-bottom: 5px; color: #333;">${component.title}</div>
               <div class="pico-description" style="font-size: 14px; color: #555;">No especificado</div>
             </div>
-            <div class="relevance-badge relevance-3" style="position: absolute; top: 10px; right: 10px; width: 25px; height: 25px; border-radius: 50%; background-color: #6c47d5; color: white; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold;">3</div>
           </li>
         `;
       }
@@ -1448,9 +1446,12 @@ IMPORTANTE:
               throw error;
             }
             
+            // Asegurarnos de que backoffTime esté definido incluso en caso de error
+            const retryBackoffTime = Math.pow(2, attempt) * 10;
+            
             // Si tenemos más reintentos, esperar antes del siguiente intento
-            logInfo(method, `Esperando ${backoffTime}s antes del siguiente intento...`);
-            await new Promise(resolve => setTimeout(resolve, backoffTime * 1000));
+            logInfo(method, `Esperando ${retryBackoffTime}s antes del siguiente intento...`);
+            await new Promise(resolve => setTimeout(resolve, retryBackoffTime * 1000));
           }
         }
         
@@ -1541,8 +1542,8 @@ IMPORTANTE:
     try {
       // Generar la síntesis con un modelo Claude de mayor capacidad
       const synthesisContent = await this.generateResponse(prompt, {
-        specificModel: 'claude-3-opus-20240229', // Usar un modelo más capaz para la síntesis
-        temperature: 0.5 // Menor temperatura para mayor consistencia
+        specificModel: 'claude-3-haiku-20240307', // Usar un modelo más capaz para la síntesis
+        temperature: 0.3 // Menor temperatura para mayor consistencia
       });
       
       logInfo(method, `Síntesis generada exitosamente. Longitud: ${synthesisContent.length} caracteres`);

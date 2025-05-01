@@ -11,13 +11,19 @@
 
 .search-input {
   flex: 1;
-  padding: 1rem 1.2rem;
-  font-size: 1rem;
+  padding: 1.4rem 1.5rem;
+  font-size: 0.9rem;
+  min-height: 160px;
+  height: auto;
+  max-height: 400px;
   border: 2px solid #e1e5e9;
   border-right: none;
   border-radius: var(--border-radius) 0 0 var(--border-radius);
   outline: none;
   transition: var(--transition);
+  line-height: 1.6;
+  resize: vertical;
+  overflow-y: auto;
 }
 
 .search-input:focus {
@@ -28,13 +34,15 @@
   background-color: var(--secondary-color);
   color: white;
   border: none;
-  padding: 0 1.5rem;
+  padding: 0 1.8rem;
   border-radius: 0 var(--border-radius) var(--border-radius) 0;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: var(--transition);
+  font-size: 1.1rem;
+  align-self: stretch;
 }
 
 .search-button:hover {
@@ -43,4 +51,5 @@
 
 .search-icon {
   margin-right: 0.5rem;
+  font-size: 1.2rem;
 } 

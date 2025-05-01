@@ -25,7 +25,7 @@ const logError = (component, message, error) => {
 };
 
 const App = () => {
-  const [iaEnabled, setIaEnabled] = useState(false);
+  const [iaEnabled, setIaEnabled] = useState(true);
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState([]);

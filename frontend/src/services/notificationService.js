@@ -5,6 +5,60 @@ import 'sweetalert2/dist/sweetalert2.css';
  * Servicio para mostrar notificaciones y alertas con SweetAlert2
  */
 class NotificationService {
+  constructor() {
+    // Almacenar referencia global a cualquier alerta activa
+    this.activeAlerts = {};
+    // Flag para rastrear si estamos en un proceso de cierre explícito
+    this.isExplicitlyClosing = false;
+    // ID único para las alertas
+    this.alertCounter = 0;
+  }
+
+  /**
+   * Genera un ID único para cada alerta
+   * @returns {string} - ID único
+   */
+  _generateAlertId() {
+    this.alertCounter++;
+    return `alert-${Date.now()}-${this.alertCounter}`;
+  }
+
+  /**
+   * Limpia todos los intervalos y cierra todas las alertas de manera forzada
+   * @private
+   */
+  _forceCloseAllAlerts() {
+    // Establecer el flag para prevenir reaparición de alertas
+    this.isExplicitlyClosing = true;
+
+    // Limpiar todos los intervalos asociados a las alertas
+    Object.values(this.activeAlerts).forEach(alertData => {
+      if (alertData && alertData.intervalId) {
+        clearInterval(alertData.intervalId);
+      }
+    });
+
+    // Limpiar cualquier intervalo directamente en los popups
+    const popups = document.querySelectorAll('.swal2-popup');
+    popups.forEach(popup => {
+      const intervalId = popup.getAttribute('data-interval-id');
+      if (intervalId) {
+        clearInterval(parseInt(intervalId, 10));
+      }
+    });
+    
+    // Cerrar todas las alertas de SweetAlert2
+    Swal.close();
+    
+    // Vaciar el registro de alertas activas
+    this.activeAlerts = {};
+    
+    // Después de un tiempo, restaurar el flag
+    setTimeout(() => {
+      this.isExplicitlyClosing = false;
+    }, 500);
+  }
+
   /**
    * Muestra una notificación de proceso en curso
    * @param {string} title - Título de la notificación
@@ -12,7 +66,12 @@ class NotificationService {
    * @returns {object} - Objeto de SweetAlert2 para controlar la alerta
    */
   showProcessNotification(title, message) {
-    return Swal.fire({
+    // Si estamos en proceso de cierre explícito, no mostrar una nueva alerta
+    if (this.isExplicitlyClosing) return null;
+    
+    const alertId = this._generateAlertId();
+    
+    const alert = Swal.fire({
       title: title,
       html: message,
       icon: 'info',
@@ -22,19 +81,30 @@ class NotificationService {
       showConfirmButton: false,
       didOpen: () => {
         Swal.showLoading();
+        // Asignar el ID al popup
+        const popup = Swal.getPopup();
+        if (popup) popup.setAttribute('data-alert-id', alertId);
       }
     });
+    
+    // Registrar la alerta
+    this.activeAlerts[alertId] = { alert, intervalId: null };
+    
+    return alertId;
   }
 
   /**
    * Actualiza una notificación existente
-   * @param {object} alert - Objeto de alerta de SweetAlert2
+   * @param {string} alertId - ID de la alerta de SweetAlert2
    * @param {string} title - Nuevo título
    * @param {string} message - Nuevo mensaje
    * @param {string} icon - Nuevo icono (info, success, warning, error)
    */
-  updateNotification(alert, title, message, icon = 'info') {
-    if (alert) {
+  updateNotification(alertId, title, message, icon = 'info') {
+    // Si estamos en proceso de cierre explícito, no actualizar
+    if (this.isExplicitlyClosing) return;
+    
+    if (alertId && this.activeAlerts[alertId]) {
       Swal.update({
         title: title,
         html: message,
@@ -45,12 +115,19 @@ class NotificationService {
 
   /**
    * Cierra una notificación existente
-   * @param {object} alert - Objeto de alerta de SweetAlert2
+   * @param {string} alertId - ID de la alerta de SweetAlert2
    */
-  closeNotification(alert) {
-    if (alert) {
-      Swal.close();
-    }
+  closeNotification(alertId) {
+    // Establecer flag para prevenir reaparición
+    this.isExplicitlyClosing = true;
+    
+    // Limpiar todos los intervalos y cerrar alertas de manera forzada
+    this._forceCloseAllAlerts();
+    
+    // Después de un tiempo, restaurar el flag
+    setTimeout(() => {
+      this.isExplicitlyClosing = false;
+    }, 500);
   }
 
   /**
@@ -59,14 +136,28 @@ class NotificationService {
    * @param {string} message - Mensaje de la notificación
    */
   showSuccess(title, message) {
-    return Swal.fire({
+    // Si estamos en proceso de cierre explícito, no mostrar una nueva alerta
+    if (this.isExplicitlyClosing) return null;
+    
+    const alertId = this._generateAlertId();
+    
+    const alert = Swal.fire({
       title: title,
       html: message,
       icon: 'success',
       timer: 2000,
       timerProgressBar: true,
-      showConfirmButton: false
+      showConfirmButton: false,
+      didOpen: (popup) => {
+        // Asignar el ID al popup
+        if (popup) popup.setAttribute('data-alert-id', alertId);
+      }
     });
+    
+    // Registrar la alerta
+    this.activeAlerts[alertId] = { alert, intervalId: null };
+    
+    return alertId;
   }
 
   /**
@@ -75,12 +166,26 @@ class NotificationService {
    * @param {string} message - Mensaje de la notificación
    */
   showError(title, message) {
-    return Swal.fire({
+    // Si estamos en proceso de cierre explícito, no mostrar una nueva alerta
+    if (this.isExplicitlyClosing) return null;
+    
+    const alertId = this._generateAlertId();
+    
+    const alert = Swal.fire({
       title: title,
       html: message,
       icon: 'error',
-      confirmButtonText: 'Entendido'
+      confirmButtonText: 'Entendido',
+      didOpen: (popup) => {
+        // Asignar el ID al popup
+        if (popup) popup.setAttribute('data-alert-id', alertId);
+      }
     });
+    
+    // Registrar la alerta
+    this.activeAlerts[alertId] = { alert, intervalId: null };
+    
+    return alertId;
   }
 
   /**
@@ -91,6 +196,10 @@ class NotificationService {
    * @param {string} customMessage - Mensaje adicional para mostrar (opcional)
    */
   showProcessSteps(steps, currentStep = 0, customMessage = '') {
+    // Si estamos en proceso de cierre explícito, no mostrar una nueva alerta
+    if (this.isExplicitlyClosing) return null;
+    
+    const alertId = this._generateAlertId();
     const totalSteps = steps.length;
     const progressPercent = ((currentStep + 1) / totalSteps) * 100;
     
@@ -129,6 +238,7 @@ class NotificationService {
     
     const messagesToShow = customMessage || getRandomMessage();
     
+    // Preparar el HTML para los pasos
     const stepsHtml = steps.map((step, index) => {
       const status = index < currentStep ? 'completado' : 
                      index === currentStep ? 'en proceso' : 'pendiente';
@@ -142,7 +252,11 @@ class NotificationService {
       
       // Indicador de tiempo estimado para el paso actual
       let timeIndicator = '';
-      if (isCurrentInProgressStep) {
+      if (isCurrentInProgressStep && step.estimatedTime) {
+        // Si el paso tiene un tiempo estimado, mostrarlo
+        timeIndicator = `<span class="time-estimate">(aprox. ${Math.ceil(step.estimatedTime)} segundos)</span>`;
+      } else if (isCurrentInProgressStep) {
+        // Tiempos genéricos si no hay estimación específica
         if (currentStep === 2) { // Paso de búsqueda de artículos (más largo)
           timeIndicator = '<span class="time-estimate">(esto puede tomar 30-60 segundos)</span>';
         } else if (currentStep === 3) { // Paso de análisis
@@ -231,6 +345,18 @@ class NotificationService {
           font-weight: normal;
           margin-left: 5px;
         }
+        .time-total-estimate {
+          display: block;
+          margin-top: 10px;
+          padding: 6px 10px;
+          background-color: #fffbf2;
+          border: 1px solid #ffe0b2;
+          border-radius: 4px;
+          color: #e67e22;
+          font-weight: 500;
+          text-align: center;
+          font-size: 0.9em;
+        }
         .motivational-message {
           margin-top: 20px;
           padding: 15px;
@@ -290,47 +416,84 @@ class NotificationService {
       </div>
     `;
     
-    return Swal.fire({
+    let intervalId = null;
+    
+    const swalPromise = Swal.fire({
       title: 'Procesando su consulta',
       html: contentHtml,
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,
-      didOpen: () => {
+      didOpen: (popup) => {
+        // Asignar el ID al popup
+        if (popup) popup.setAttribute('data-alert-id', alertId);
+        
         // Actualizar mensaje cada 8 segundos si estamos en paso 2 o 3 (los más largos)
         if (currentStep === 2 || currentStep === 3) {
           const messageElement = Swal.getHtmlContainer().querySelector('.motivational-message');
           const updateMessage = () => {
-            messageElement.innerHTML = getRandomMessage();
+            // Solo actualizar si la alerta aún está visible
+            if (document.body.contains(popup) && !this.isExplicitlyClosing) {
+              messageElement.innerHTML = getRandomMessage();
+            }
           };
           
-          const intervalId = setInterval(updateMessage, 8000);
+          intervalId = setInterval(updateMessage, 8000);
           
           // Guardar el ID del intervalo para limpiarlo más tarde
-          Swal.getPopup().setAttribute('data-interval-id', intervalId);
+          popup.setAttribute('data-interval-id', intervalId);
         }
       },
       willClose: () => {
         // Limpiar el intervalo al cerrar
-        const intervalId = Swal.getPopup().getAttribute('data-interval-id');
         if (intervalId) {
           clearInterval(intervalId);
         }
+        
+        // Eliminar del registro de alertas activas
+        delete this.activeAlerts[alertId];
       }
     });
+    
+    // Registrar la alerta con su intervalo
+    this.activeAlerts[alertId] = { 
+      alert: swalPromise, 
+      intervalId: intervalId 
+    };
+    
+    return alertId;
   }
 
   /**
    * Actualiza el paso actual en la notificación de flujo de proceso
-   * @param {object} alert - Objeto de alerta de SweetAlert2
+   * @param {string} alertId - ID de la alerta de SweetAlert2
    * @param {Array} steps - Arreglo de pasos
    * @param {number} newCurrentStep - Nuevo paso actual
    * @param {string} customMessage - Mensaje personalizado opcional
    */
-  updateProcessStep(alert, steps, newCurrentStep, customMessage = '') {
-    if (alert) {
-      this.showProcessSteps(steps, newCurrentStep, customMessage);
+  updateProcessStep(alertId, steps, newCurrentStep, customMessage = '') {
+    // Si estamos en proceso de cierre explícito, no actualizar
+    if (this.isExplicitlyClosing) return;
+    
+    // Cerrar la alerta anterior de manera controlada
+    if (alertId && this.activeAlerts[alertId]) {
+      const oldIntervalId = this.activeAlerts[alertId].intervalId;
+      if (oldIntervalId) {
+        clearInterval(oldIntervalId);
+      }
+      
+      // No establecer isExplicitlyClosing aquí para evitar que se bloquee la nueva alerta
+      Swal.close();
+      
+      // Mostrar la alerta con el paso actualizado
+      const newAlertId = this.showProcessSteps(steps, newCurrentStep, customMessage);
+      
+      // Reemplazar el ID de alerta en el caller
+      return newAlertId;
     }
+    
+    // Si no hay alerta previa, simplemente mostrar una nueva
+    return this.showProcessSteps(steps, newCurrentStep, customMessage);
   }
 
   /**
@@ -339,12 +502,26 @@ class NotificationService {
    * @param {string} message - Mensaje de la notificación
    */
   showInfo(title, message) {
-    return Swal.fire({
+    // Si estamos en proceso de cierre explícito, no mostrar una nueva alerta
+    if (this.isExplicitlyClosing) return null;
+    
+    const alertId = this._generateAlertId();
+    
+    const alert = Swal.fire({
       title: title,
       html: message,
       icon: 'info',
-      confirmButtonText: 'Entendido'
+      confirmButtonText: 'Entendido',
+      didOpen: (popup) => {
+        // Asignar el ID al popup
+        if (popup) popup.setAttribute('data-alert-id', alertId);
+      }
     });
+    
+    // Registrar la alerta
+    this.activeAlerts[alertId] = { alert, intervalId: null };
+    
+    return alertId;
   }
 }
 

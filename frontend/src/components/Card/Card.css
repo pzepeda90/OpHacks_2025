@@ -500,4 +500,31 @@
 /* Sobrescribir estilo anterior de badge.type */
 .badge.type {
   background-color: #7f8c8d;
+}
+
+/* Centrar los metric-badge en su contenedor */
+.metrics-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+}
+
+.metric-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 30px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+@media (max-width: 768px) {
+  .metrics-badges {
+    flex-direction: column;
+    align-items: center;
+  }
 } 

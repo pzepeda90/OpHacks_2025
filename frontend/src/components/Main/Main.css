@@ -207,16 +207,15 @@
 
 .synthesis-text {
   line-height: 1.75;
-  color: #333333;
+  color: #fff !important;
   text-align: justify;
   overflow-y: auto;
   font-size: 1.05rem;
   padding: 10px 0;
 }
 
-/* Asegurar que todo el contenido dentro del texto de síntesis tenga colores legibles */
 .synthesis-text * {
-  color: #333333 !important;
+  color: black;
 }
 
 .synthesis-text h4 {
@@ -253,16 +252,16 @@
   font-style: italic;
 }
 
-.synthesis-text .heterogeneity-stat .stat-name {
-  color: #718096 !important;
+.heterogeneity-stat .stat-name {
+  color: black !important;
 }
 
 .synthesis-text .heterogeneity-stat .stat-value {
-  color: #4a5568 !important;
+  color: white !important;
 }
 
-.synthesis-text .heterogeneity-stat .stat-interpretation {
-  color: #718096 !important;
+.heterogeneity-stat .stat-interpretation {
+  color: black !important;
 }
 
 .synthesis-text p {
@@ -419,30 +418,80 @@
   background-color: #f8f9fa;
   border-radius: 8px;
   border-left: 4px solid #6c47d5;
+  justify-content: center;
+  align-items: center;
 }
 
 .heterogeneity-stat {
+  background: #fff !important;
+  color: #222 !important;
+  box-shadow: 0 2px 8px rgba(70,100,220,0.10);
+  min-width: 140px;
+  min-height: 120px;
+  max-height: 120px;
+  height: 120px;
+  align-items: center;
   display: flex;
   flex-direction: column;
-  min-width: 120px;
+  justify-content: center;
+  padding: 22px 18px;
+  margin: 0 4px;
 }
 
-.heterogeneity-stat .stat-name {
-  font-size: 0.8rem;
-  color: #718096;
-  margin-bottom: 5px;
-}
-
-.heterogeneity-stat .stat-value {
-  font-size: 1.2rem;
+.stat-name {
+  font-size: 0.9rem;
+  color: #4566e0;
+  margin-bottom: 7px;
   font-weight: 600;
-  color: #4a5568;
 }
 
-.heterogeneity-stat .stat-interpretation {
-  font-size: 0.75rem;
+.stat-value {
+  display: inline-block;
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  padding: 4px 14px;
+  border-radius: 20px;
+  color: #fff;
+  background: #6c47d5;
+}
+
+/* Colores para el badge según valor (ejemplo: bueno, regular, malo) */
+.stat-value.badge-bueno {
+  background: #218838;
+  color: #111 !important;
+}
+.stat-value.badge-regular {
+  background: #ff9800;
+  color: #111 !important;
+}
+.stat-value.badge-malo {
+  background: #c82333;
+  color: #fff !important;
+}
+
+.stat-interpretation {
+  font-size: 0.85rem;
   margin-top: 5px;
-  color: #718096;
+  color: #4a5568;
+  text-align: center;
+}
+
+/* Asegurar texto oscuro y legible en todo el bloque */
+.heterogeneity-stats, .heterogeneity-stats * {
+  color: white;
+}
+
+@media (max-width: 600px) {
+  .heterogeneity-stats {
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+  }
+  .heterogeneity-stat {
+    min-width: 100%;
+    padding: 10px 8px;
+  }
 }
 
 /* Estilos para gráficos generados */
@@ -469,11 +518,6 @@
     padding: 8px 10px;
   }
   
-  .heterogeneity-stats {
-    flex-direction: column;
-    gap: 10px;
-  }
-  
   .synthesis-meta-banner {
     flex-direction: column;
     align-items: center;
@@ -492,15 +536,15 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: rgba(0, 0, 0, 0.6);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1100;
   backdrop-filter: blur(5px);
   transition: opacity 0.3s ease;
   opacity: 1;
   animation: modalOverlayFadeIn 0.3s ease forwards;
+  z-index: 900;
 }
 
 @keyframes modalOverlayFadeIn {
@@ -761,4 +805,99 @@
   background-color: #fef8e8;
   border-radius: 8px;
   border-left: 4px solid #f7b924;
+}
+
+/* === Mejoras para la cuadrícula PICO === */
+.pico-grid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin: 25px 0;
+  padding: 0;
+  list-style: none;
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+}
+
+.pico-component {
+  background-color: #f8f9fa;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(70, 100, 220, 0.07);
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  position: relative;
+  height: 180px;
+  min-width: 220px;
+  max-width: 260px;
+  flex: 1 1 220px;
+  box-sizing: border-box;
+  justify-content: center;
+  width: 100%;
+}
+
+.pico-letter {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background-color: #4566e0;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  font-size: 20px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 8px rgba(70, 100, 220, 0.10);
+}
+
+.pico-title {
+  font-weight: 600;
+  color: #6c47d5;
+  margin-bottom: 6px;
+  font-size: 1.05rem;
+}
+
+.pico-description {
+  color: #4a5568;
+  font-size: 0.97rem;
+  margin-bottom: 8px;
+}
+
+.relevance-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1rem;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(70, 100, 220, 0.10);
+  border: 2px solid #fff;
+  z-index: 2;
+}
+
+.relevance-5 { background-color: #c6f6d5; color: #38a169; }
+.relevance-4 { background-color: #d6f5fb; color: #319795; }
+.relevance-3 { background-color: #fefcbf; color: #d69e2e; }
+.relevance-2 { background-color: #fed7d7; color: #e53e3e; }
+.relevance-1 { background-color: #e2e8f0; color: #718096; }
+
+@media (max-width: 900px) {
+  .pico-grid {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pico-component {
+    min-width: 100%;
+    max-width: 100%;
+    height: 140px;
+  }
 } 
